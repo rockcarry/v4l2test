@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(LOCAL_PATH)/../Config.mk
 
-ifeq ($(CONFIG_HW_PLAT),a31)
+ifeq ($(CONFIG_HW_PLAT),libjpeg)
 
 include $(CLEAR_VARS)
 
@@ -13,19 +13,15 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 
 LOCAL_SHARED_LIBRARIES += \
-    libsunxi_alloc \
-    libcedarxbase \
-    libcedarxosal \
-    libcedarv \
+    libutils \
+    libcutils \
+    libjpeg
 
 LOCAL_C_INCLUDES += \
-    frameworks/av/media/CedarX-Projects/CedarX/include \
-    frameworks/av/media/CedarX-Projects/CedarX/include/include_system
+    external/jpeg
     
 LOCAL_SRC_FILES := \
-    jpegdecoder.c \
-    formatconvert.c \
-    LibveDecoder.c
+    jpegdecoder.c
 
 include $(BUILD_SHARED_LIBRARY)
 
