@@ -1,5 +1,5 @@
-#ifndef __USBCAM_H__
-#define __USBCAM_H__
+#ifndef __CAMCDR_H__
+#define __CAMCDR_H__
 
 // 包含头文件
 #include <linux/videodev2.h>
@@ -22,31 +22,30 @@ struct video_buffer{
 };
 
 typedef struct {
-    struct v4l2_capability  cap;
-    struct v4l2_fmtdesc     desc;
     struct v4l2_format      fmt;
     struct v4l2_buffer      buf;
     struct video_buffer     vbs[VIDEO_CAPTURE_BUFFER_COUNT];
     int                     fd;
     sp<ANativeWindow>       new_win;
-    int                     new_w;
-    int                     new_h;
     sp<ANativeWindow>       cur_win;
-    int                     cur_w;
-    int                     cur_h;
     pthread_t               thread_id;
     int                     thread_state;
-    int                     update_preview_flag;
-    void                   *decoder;
-} USBCAM;
+    int                     update_flag;
+    int                     win_pixfmt;
+    int                     cam_input;
+    int                     cam_pixfmt;
+    int                     cam_w;
+    int                     cam_h;
+    void                   *jpegdec;
+} CAMCDR;
 
 // 函数定义
-USBCAM* usbcam_init (const char *dev);
-void    usbcam_close(USBCAM *cam);
-void    usbcam_set_preview_window(USBCAM *cam, const sp<ANativeWindow> win, int w, int h);
-void    usbcam_set_preview_target(USBCAM *cam, const sp<IGraphicBufferProducer>& gbp, int w, int h);
-void    usbcam_start_preview(USBCAM *cam);
-void    usbcam_stop_preview (USBCAM *cam);
+CAMCDR* camcdr_init (const char *dev, int sub, int fmt, int w, int h);
+void    camcdr_close(CAMCDR *cam);
+void    camcdr_set_preview_window(CAMCDR *cam, const sp<ANativeWindow> win);
+void    camcdr_set_preview_target(CAMCDR *cam, const sp<IGraphicBufferProducer>& gbp);
+void    camcdr_start_preview(CAMCDR *cam);
+void    camcdr_stop_preview (CAMCDR *cam);
 
 #endif
 

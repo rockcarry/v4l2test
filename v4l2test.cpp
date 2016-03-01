@@ -1,17 +1,23 @@
 #include <cutils/properties.h>
-#include "usbcam.h"
+#include "camcdr.h"
 
 int main(int argc, char *argv[])
 {
-    USBCAM *cam = NULL;
-    char    dev[32];
+    CAMCDR *cam = NULL;
+    char    dev[32] = "/dev/video0";
+    int     sub     = 0;
+    int     fmt     = V4L2_PIX_FMT_YUYV;
+    int     w       = 640;
+    int     h       = 480;
 
-    if (argc < 2) {
-        strcpy(dev, "/dev/video0");
+    switch (argc) {
+    case 6: h = atoi(argv[5]);
+    case 5: w = atoi(argv[4]);
+    case 4: fmt = !strcmp(argv[3], "mjpeg") ? V4L2_PIX_FMT_MJPEG : fmt;
+    case 3: sub = atoi(argv[2]);
+    case 2: strcpy(dev, argv[1]);
     }
-    else {
-        strcpy(dev, argv[1]);
-    }
+    printf("dev = %s, sub = %d, fmt = %d, w = %d, h = %d\n", dev, sub, fmt, w, h);
 
     // set exit flag to 0
     property_set("sys.v4l2.test.exit", "0");
@@ -38,13 +44,14 @@ int main(int argc, char *argv[])
 
     sp<Surface> surface = surfaceControl->getSurface();
     sp<ANativeWindow> win = surface;
+    native_window_set_buffers_dimensions(win.get(), dinfo.w, dinfo.h);
 
-    // init usbcam
-    cam = usbcam_init(dev);
+    // init camcdr
+    cam = camcdr_init(dev, sub, fmt, w, h);
 
     // startpreview
-    usbcam_set_preview_window(cam, win, dinfo.w, dinfo.h);
-    usbcam_start_preview(cam);
+    camcdr_set_preview_window(cam, win);
+    camcdr_start_preview(cam);
 
     // wait exit
     while (1) {
@@ -56,10 +63,10 @@ int main(int argc, char *argv[])
     }
 
     // stoppreview
-    usbcam_stop_preview(cam);
+    camcdr_stop_preview(cam);
 
     // close usbcam
-    usbcam_close(cam);
+    camcdr_close(cam);
 
     return 0;
 }
