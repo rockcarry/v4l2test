@@ -82,15 +82,9 @@ static void* video_render_thread_proc(void *param)
 
                 if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
                     if (len) {
-                        int dst_stride = buf->stride;
-                        switch (cam->win_pixfmt) {
-                        case HAL_PIXEL_FORMAT_YV12     : dst_stride *= 1;
-                        case HAL_PIXEL_FORMAT_RGB_565  : dst_stride *= 2;
-                        case HAL_PIXEL_FORMAT_RGBX_8888: dst_stride *= 4;
-                        }
                         if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
                             ffjpegdec_decode  (cam->jpegdec, data, len, pts);
-                            ffjpegdec_getframe(cam->jpegdec, dst, buf->width, buf->height, dst_stride);
+                            ffjpegdec_getframe(cam->jpegdec, dst, buf->width, buf->height, buf->stride);
                         }
                     }
                     else {
@@ -226,7 +220,6 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
         ALOGD("- %d, %d\n", frmsize.discrete.width, frmsize.discrete.height);
 
         curdist = (cam->cam_w - w) * (cam->cam_w - w) + (cam->cam_h - h) * (cam->cam_h - h);
-        ALOGD("curdist = %d, mindist = %d", curdist, mindist);
         if (curdist < mindist) {
             bestw = w;
             besth = h;
@@ -237,7 +230,7 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
     cam->cam_w = bestw;
     cam->cam_h = besth;
     ALOGD("\n");
-    ALOGD("using pixel format: %d\n", cam->cam_pixfmt);
+    ALOGD("using pixel format: 0x%0x\n", cam->cam_pixfmt);
     ALOGD("using frame size: %d, %d\n", cam->cam_w, cam->cam_h);
     ALOGD("\n");
     //-- enum frame size to find the best
@@ -272,9 +265,9 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
         cam->buf.index  = i;
         ioctl(cam->fd, VIDIOC_QUERYBUF, &cam->buf);
 
-        cam->vbs[i].addr = mmap(NULL, cam->buf.length, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                cam->fd, cam->buf.m.offset);
-        cam->vbs[i].len  = cam->buf.length;
+        cam->vbs[i].addr= mmap(NULL, cam->buf.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                               cam->fd, cam->buf.m.offset);
+        cam->vbs[i].len = cam->buf.length;
 
         ioctl(cam->fd, VIDIOC_QBUF, &cam->buf);
     }

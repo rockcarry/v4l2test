@@ -88,7 +88,7 @@ void ffjpegdec_getframe(void *decoder, void *buf, int w, int h, int stride)
 {
     CONTEXT *context  = (CONTEXT*)decoder;
     int src_stride    = context->cinfo.output_width * context->cinfo.output_components;
-    int dst_stride    = stride;
+    int dst_stride    = stride * 4;
     uint8_t *dst_buf  = (uint8_t*)buf;
     int      dst_cury = 0;
     int      dst_newy = 0;

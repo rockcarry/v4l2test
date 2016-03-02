@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     // stoppreview
     camcdr_stop_preview(cam);
 
-    // close usbcam
+    // close camcdr
     camcdr_close(cam);
 
     return 0;
