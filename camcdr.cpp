@@ -260,6 +260,12 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
         ALOGD("colorspace:   %d\n", v4l2fmt.fmt.pix.colorspace  );
         cam->cam_stride = v4l2fmt.fmt.pix.bytesperline;
     }
+    else {
+        ALOGW("failed to camera preview size and pixel format !\n");
+        close(cam->fd);
+        cam->fd = 0;
+        goto done;
+    }
 
     struct v4l2_requestbuffers req;
     req.count  = VIDEO_CAPTURE_BUFFER_COUNT;
