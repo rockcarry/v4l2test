@@ -22,7 +22,6 @@ struct video_buffer{
 };
 
 typedef struct {
-    struct v4l2_format      fmt;
     struct v4l2_buffer      buf;
     struct video_buffer     vbs[VIDEO_CAPTURE_BUFFER_COUNT];
     int                     fd;
@@ -32,8 +31,11 @@ typedef struct {
     int                     thread_state;
     int                     update_flag;
     int                     win_pixfmt;
-    int                     cam_input;
+    int                     win_stride;
+    int                     win_w;
+    int                     win_h;
     int                     cam_pixfmt;
+    int                     cam_stride;
     int                     cam_w;
     int                     cam_h;
     void                   *jpegdec;

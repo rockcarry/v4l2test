@@ -10,12 +10,8 @@
 #include "camcdr.h"
 
 // 内部常量定义
-#if defined(CONFIG_FFJPEGDEC_A31)
+#define DO_USE_VAR(v) do { v = v; } while (0)
 #define CAMCDE_DEF_WIN_PIXFMT  HAL_PIXEL_FORMAT_YV12
-#elif defined(CONFIG_FFJPEGDEC_LJP)
-#define CAMCDE_DEF_WIN_PIXFMT  HAL_PIXEL_FORMAT_RGBX_8888
-#endif
-
 #define CAMCDR_DEF_CAM_PIXFMT  V4L2_PIX_FMT_YUYV
 #define CAMCDR_DEF_CAM_WIDTH   640
 #define CAMCDR_DEF_CAM_HEIGHT  480
@@ -26,12 +22,45 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
-static void render_rand(void *buf, int size) {
-    uint32_t *dst = (uint32_t*)buf;
-    while (size > 0) {
-        *dst++ = rand();
-        size  -= 4;
+static void render_v4l2(CAMCDR *cam,
+                        void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
+                        void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts) {
+    DO_USE_VAR(dstlen   );
+    DO_USE_VAR(srcstride);
+    DO_USE_VAR(srcw     );
+    DO_USE_VAR(srch     );
+
+    if (srclen) {
+        switch (srcfmt) {
+        case V4L2_PIX_FMT_MJPEG:
+            ffjpegdec_decode  (cam->jpegdec, srcbuf, srclen, pts);
+            ffjpegdec_getframe(cam->jpegdec, dstbuf, dstw, dsth, dststride);
+            break;
+        case V4L2_PIX_FMT_YUYV:
+            break;
+        }
     }
+    else {
+        uint32_t  *dst = (uint32_t*)dstbuf;
+        int dst_y_stride = dststride;
+        int dst_y_size   = dst_y_stride * dsth;
+        int dst_c_stride = ALIGN(dst_y_stride / 2, 16);
+        int dst_c_size   = dst_c_stride * dsth / 2;
+        int size         = 0;
+        switch (dstfmt) {
+        case HAL_PIXEL_FORMAT_YV12:
+            size = dst_y_size + dst_c_size * 2;
+            break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+            size = dst_y_size * 4;
+            break;
+        }
+        while (size > 0) {
+            *dst++ = rand();
+            size  -= 4;
+        }
+    }
+}
 }
 
 static void* video_render_thread_proc(void *param)
@@ -81,30 +110,9 @@ static void* video_render_thread_proc(void *param)
                 void *dst = NULL;
 
                 if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
-                    if (len) {
-                        if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
-                            ffjpegdec_decode  (cam->jpegdec, data, len, pts);
-                            ffjpegdec_getframe(cam->jpegdec, dst, buf->width, buf->height, buf->stride);
-                        }
-                    }
-                    else {
-                        int dst_y_size   = buf->stride * buf->height;
-                        int dst_c_stride = ALIGN(buf->stride / 2, 16);
-                        int dst_c_size   = dst_c_stride * buf->height / 2;
-                        int dst_buf_size = 0;
-                        switch (cam->win_pixfmt) {
-                        case HAL_PIXEL_FORMAT_YV12:
-                            dst_buf_size = dst_y_size + dst_c_size * 2;
-                            break;
-                        case HAL_PIXEL_FORMAT_RGB_565:
-                            dst_buf_size = dst_y_size * 2;
-                            break;
-                        case HAL_PIXEL_FORMAT_RGBX_8888:
-                            dst_buf_size = dst_y_size * 4;
-                            break;
-                        }
-                        render_rand(dst, dst_buf_size);
-                    }
+                    render_v4l2(cam,
+                        dst , -1 , buf->format    , buf->stride    , buf->width, buf->height,
+                        data, len, cam->cam_pixfmt, cam->cam_stride, cam->cam_w, cam->cam_h, pts);
                     mapper.unlock(buf->handle);
                 }
 
@@ -138,7 +146,6 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
     // init context
     memset(cam, 0, sizeof(CAMCDR));
     cam->win_pixfmt= CAMCDE_DEF_WIN_PIXFMT;
-    cam->cam_input = sub;
     cam->cam_pixfmt= fmt ? fmt : CAMCDR_DEF_CAM_PIXFMT;
     cam->cam_w     = w   ? w   : CAMCDR_DEF_CAM_WIDTH;
     cam->cam_h     = h   ? h   : CAMCDR_DEF_CAM_HEIGHT;
@@ -164,7 +171,7 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
 
     if (strcmp((char*)cap.driver, "uvcvideo") != 0) {
         struct v4l2_input input;
-        input.index = cam->cam_input;
+        input.index = sub;
         ioctl(cam->fd, VIDIOC_S_INPUT, &input);
     }
 
@@ -235,21 +242,23 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
     ALOGD("\n");
     //-- enum frame size to find the best
 
-    cam->fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    ioctl(cam->fd, VIDIOC_G_FMT, &cam->fmt);
-    cam->fmt.fmt.pix.pixelformat = cam->cam_pixfmt;
-    cam->fmt.fmt.pix.width       = cam->cam_w;
-    cam->fmt.fmt.pix.height      = cam->cam_h;
-    if (ioctl(cam->fd, VIDIOC_S_FMT, &cam->fmt) != -1) {
+    struct v4l2_format v4l2fmt;
+    v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    ioctl(cam->fd, VIDIOC_G_FMT, &v4l2fmt);
+    v4l2fmt.fmt.pix.pixelformat = cam->cam_pixfmt;
+    v4l2fmt.fmt.pix.width       = cam->cam_w;
+    v4l2fmt.fmt.pix.height      = cam->cam_h;
+    if (ioctl(cam->fd, VIDIOC_S_FMT, &v4l2fmt) != -1) {
         ALOGD("VIDIOC_S_FMT      \n");
         ALOGD("------------------\n");
-        ALOGD("width:        %d\n", cam->fmt.fmt.pix.width       );
-        ALOGD("height:       %d\n", cam->fmt.fmt.pix.height      );
-        ALOGD("pixfmt:       %d\n", cam->fmt.fmt.pix.pixelformat );
-        ALOGD("field:        %d\n", cam->fmt.fmt.pix.field       );
-        ALOGD("bytesperline: %d\n", cam->fmt.fmt.pix.bytesperline);
-        ALOGD("sizeimage:    %d\n", cam->fmt.fmt.pix.sizeimage   );
-        ALOGD("colorspace:   %d\n", cam->fmt.fmt.pix.colorspace  );
+        ALOGD("width:        %d\n", v4l2fmt.fmt.pix.width       );
+        ALOGD("height:       %d\n", v4l2fmt.fmt.pix.height      );
+        ALOGD("pixfmt:       %d\n", v4l2fmt.fmt.pix.pixelformat );
+        ALOGD("field:        %d\n", v4l2fmt.fmt.pix.field       );
+        ALOGD("bytesperline: %d\n", v4l2fmt.fmt.pix.bytesperline);
+        ALOGD("sizeimage:    %d\n", v4l2fmt.fmt.pix.sizeimage   );
+        ALOGD("colorspace:   %d\n", v4l2fmt.fmt.pix.colorspace  );
+        cam->cam_stride = v4l2fmt.fmt.pix.bytesperline;
     }
 
     struct v4l2_requestbuffers req;
@@ -273,7 +282,11 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
     }
 
     // init jpeg decoder
-    cam->jpegdec = ffjpegdec_init();
+    if (  strcmp((char*)cap.driver, "uvcvideo") == 0
+       && cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
+        cam->jpegdec   = ffjpegdec_init();
+        cam->win_pixfmt= ffjpegdec_outtype(cam->jpegdec);
+    }
 
 done:
     cam->thread_state = (1 << 1);
@@ -293,7 +306,9 @@ void camcdr_close(CAMCDR *cam)
     pthread_join(cam->thread_id, NULL);
 
     // free jpeg decoder
-    ffjpegdec_free(cam->jpegdec);
+    if (cam->jpegdec) {
+        ffjpegdec_free(cam->jpegdec);
+    }
 
     // unmap buffers
     for (i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {

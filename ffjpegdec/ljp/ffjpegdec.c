@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <jpeglib.h>
 #include <ffjpegdec.h>
+#include <system/graphics.h>
 #include <utils/Log.h>
 
 // 内部常量定义
@@ -137,4 +138,8 @@ void ffjpegdec_free(void *decoder)
     free(context);
 }
 
-
+int ffjpegdec_outtype(void *decoder)
+{
+    DO_USE_VAR(decoder);
+    return HAL_PIXEL_FORMAT_RGBX_8888;
+}

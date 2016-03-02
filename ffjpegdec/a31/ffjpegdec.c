@@ -1,5 +1,7 @@
 // 包含头文件
 #include <ffjpegdec.h>
+#include <system/graphics.h>
+#include <utils/Log.h>
 #include "LibveDecoder.h"
 
 // 内部常量定义
@@ -27,3 +29,8 @@ void ffjpegdec_free(void *decoder)
     libveExit((DecodeHandle*)decoder);
 }
 
+int ffjpegdec_outtype(void *decoder)
+{
+    DO_USE_VAR(decoder);
+    return HAL_PIXEL_FORMAT_YV12;
+}

@@ -10,6 +10,7 @@ void* ffjpegdec_init    (void);
 void  ffjpegdec_decode  (void *decoder, void *buf, int len, int pts);
 void  ffjpegdec_getframe(void *decoder, void *buf, int w, int h, int stride);
 void  ffjpegdec_free    (void *decoder);
+int   ffjpegdec_outtype (void *decoder);
 
 #ifdef __cplusplus
 }
