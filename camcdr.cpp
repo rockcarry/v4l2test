@@ -61,7 +61,6 @@ static void render_v4l2(CAMCDR *cam,
         }
     }
 }
-}
 
 static void* video_render_thread_proc(void *param)
 {
