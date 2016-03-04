@@ -42,6 +42,7 @@ cd ffmpeg
 --disable-avfilter \
 --disable-postproc \
 --disable-everything \
+--enable-encoder=mjpeg \
 --enable-encoder=libx264 \
 --enable-encoder=aac \
 --enable-decoder=mjpeg \
