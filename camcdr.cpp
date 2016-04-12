@@ -12,6 +12,10 @@
 #define DO_USE_VAR(v)   do { v = v; } while (0)
 #define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP  // HAL_PIXEL_FORMAT_RGBX_8888
 
+#define CAMCDR_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
+                           | GRALLOC_USAGE_SW_WRITE_NEVER \
+                           | GRALLOC_USAGE_HW_TEXTURE
+
 // 内部函数实现
 static int ALIGN(int x, int y) {
     // y must be a power of 2.
@@ -77,6 +81,8 @@ static void render_v4l2(CAMCDR *cam,
     if (srcfmt == V4L2_PIX_FMT_YUYV) {
         src_linesize[0] = srcw * 2;
     }
+
+    // do sws scale
     sws_scale(cam->swsctxt, src_data, src_linesize, 0, srch, dst_data, dst_linesize);
 }
 
@@ -98,9 +104,7 @@ static void* video_render_thread_proc(void *param)
         if (cam->update_flag) {
             cam->cur_win = cam->new_win;
             if (cam->cur_win != NULL) {
-                // todo usage CAMHAL_GRALLOC_USAGE
-                native_window_set_usage(cam->cur_win.get(),
-                    GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_EXTERNAL_DISP);
+                native_window_set_usage(cam->cur_win.get(), CAMCDR_GRALLOC_USAGE);
                 native_window_set_scaling_mode  (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
                 native_window_set_buffer_count  (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
                 native_window_set_buffers_format(cam->cur_win.get(), DEF_WIN_PIX_FMT);
