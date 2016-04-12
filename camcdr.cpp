@@ -10,7 +10,7 @@
 
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
-#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP  // HAL_PIXEL_FORMAT_RGBX_8888
+#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
 
 #define CAMCDR_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
                            | GRALLOC_USAGE_SW_WRITE_NEVER \
@@ -80,6 +80,9 @@ static void render_v4l2(CAMCDR *cam,
     int      src_linesize[8] = { srcw, srcw / 1, srcw / 1 };
     if (srcfmt == V4L2_PIX_FMT_YUYV) {
         src_linesize[0] = srcw * 2;
+    }
+    if (dstfmt == HAL_PIXEL_FORMAT_RGBX_8888) {
+        dst_linesize[0] = dstw * 4;
     }
 
     // do sws scale
