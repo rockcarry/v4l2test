@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
         if (strcmp(exit, "1") == 0) {
             break;
         }
+        usleep(100*1000);
     }
 
     // stoppreview
