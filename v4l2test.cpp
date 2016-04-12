@@ -6,18 +6,16 @@ int main(int argc, char *argv[])
     CAMCDR *cam = NULL;
     char    dev[32] = "/dev/video0";
     int     sub     = 0;
-    int     fmt     = V4L2_PIX_FMT_YUYV;
     int     w       = 640;
     int     h       = 480;
 
     switch (argc) {
-    case 6: h = atoi(argv[5]);
-    case 5: w = atoi(argv[4]);
-    case 4: fmt = !strcmp(argv[3], "mjpeg") ? V4L2_PIX_FMT_MJPEG : fmt;
+    case 5: h = atoi(argv[4]);
+    case 4: w = atoi(argv[3]);
     case 3: sub = atoi(argv[2]);
     case 2: strcpy(dev, argv[1]);
     }
-    printf("dev = %s, sub = %d, fmt = %d, w = %d, h = %d\n", dev, sub, fmt, w, h);
+    printf("dev = %s, sub = %d, w = %d, h = %d\n", dev, sub, w, h);
 
     // set exit flag to 0
     property_set("sys.v4l2.test.exit", "0");
@@ -47,7 +45,7 @@ int main(int argc, char *argv[])
     native_window_set_buffers_dimensions(win.get(), dinfo.w, dinfo.h);
 
     // init camcdr
-    cam = camcdr_init(dev, sub, fmt, w, h);
+    cam = camcdr_init(dev, sub, w, h);
 
     // startpreview
     camcdr_set_preview_window(cam, win);

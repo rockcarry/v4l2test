@@ -6,15 +6,11 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <utils/Log.h>
-#include "ffjpegdec.h"
 #include "camcdr.h"
 
 // 内部常量定义
-#define DO_USE_VAR(v) do { v = v; } while (0)
-#define CAMCDE_DEF_WIN_PIXFMT  HAL_PIXEL_FORMAT_YV12
-#define CAMCDR_DEF_CAM_PIXFMT  V4L2_PIX_FMT_YUYV
-#define CAMCDR_DEF_CAM_WIDTH   640
-#define CAMCDR_DEF_CAM_HEIGHT  480
+#define DO_USE_VAR(v)   do { v = v; } while (0)
+#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP  // HAL_PIXEL_FORMAT_RGBX_8888
 
 // 内部函数实现
 static int ALIGN(int x, int y) {
@@ -25,41 +21,63 @@ static int ALIGN(int x, int y) {
 static void render_v4l2(CAMCDR *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
                         void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts) {
+
     DO_USE_VAR(dstlen   );
     DO_USE_VAR(srcstride);
-    DO_USE_VAR(srcw     );
-    DO_USE_VAR(srch     );
 
-    if (srclen) {
-        switch (srcfmt) {
-        case V4L2_PIX_FMT_MJPEG:
-            ffjpegdec_decode  (cam->jpegdec, srcbuf, srclen, pts);
-            ffjpegdec_getframe(cam->jpegdec, dstbuf, dstw, dsth, dststride);
-            break;
-        case V4L2_PIX_FMT_YUYV:
-            break;
-        }
+    if (dstfmt != DEF_WIN_PIX_FMT) {
+        return;
     }
-    else {
-        uint32_t  *dst = (uint32_t*)dstbuf;
-        int dst_y_stride = dststride;
-        int dst_y_size   = dst_y_stride * dsth;
-        int dst_c_stride = ALIGN(dst_y_stride / 2, 16);
-        int dst_c_size   = dst_c_stride * dsth / 2;
-        int size         = 0;
-        switch (dstfmt) {
-        case HAL_PIXEL_FORMAT_YV12:
-            size = dst_y_size + dst_c_size * 2;
-            break;
-        case HAL_PIXEL_FORMAT_RGBX_8888:
-            size = dst_y_size * 4;
-            break;
+
+    if (!srclen) {
+        uint32_t *dst = (uint32_t*)dstbuf;
+        int      size = 0;
+        switch (DEF_WIN_PIX_FMT) {
+        case HAL_PIXEL_FORMAT_RGB_565:      size = dstw * dsth * 2; break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:    size = dstw * dsth * 4; break;
+        case HAL_PIXEL_FORMAT_YV12:         size = dstw * dsth + dstw * dsth / 2; break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP: size = dstw * dsth + dstw * dsth / 2; break;
         }
         while (size > 0) {
             *dst++ = rand();
-            size  -= 4;
+            size  -= sizeof(uint32_t);
         }
+        return;
     }
+
+//  ALOGD("dstfmt = 0x%0x, dststride = %d, dstw = %d, dsth = %d\n", dstfmt, dststride, dstw, dsth);
+//  ALOGD("srcfmt = 0x%0x, srcstride = %d, srcw = %d, srch = %d\n", srcfmt, srcstride, srcw, srch);
+
+    if (cam->win_w != dstw || cam->win_h != dsth) {
+        AVPixelFormat sws_src_fmt = AV_PIX_FMT_NONE;
+        AVPixelFormat sws_dst_fmt = AV_PIX_FMT_NONE;
+        switch (srcfmt) {
+        case V4L2_PIX_FMT_YUYV: sws_src_fmt = AV_PIX_FMT_YUYV422; break;
+        case V4L2_PIX_FMT_NV12: sws_src_fmt = AV_PIX_FMT_NV12;    break;
+        case V4L2_PIX_FMT_NV21: sws_src_fmt = AV_PIX_FMT_NV21;    break;
+        }
+        switch (DEF_WIN_PIX_FMT) {
+        case HAL_PIXEL_FORMAT_RGB_565:      sws_dst_fmt = AV_PIX_FMT_RGB565;  break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_RGB32;   break;
+        case HAL_PIXEL_FORMAT_YV12:         sws_dst_fmt = AV_PIX_FMT_YUV420P; break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP: sws_dst_fmt = AV_PIX_FMT_NV21;    break;
+        }
+        if (cam->swsctxt) {
+            sws_freeContext(cam->swsctxt);
+        }
+        cam->swsctxt = sws_getContext(srcw, srch, sws_src_fmt, dstw, dsth, sws_dst_fmt, SWS_POINT, 0, 0, 0);
+        cam->win_w   = dstw;
+        cam->win_h   = dsth;
+    }
+
+    uint8_t* dst_data[8]     = { (uint8_t*)dstbuf, (uint8_t*)dstbuf + dstw * dsth, (uint8_t*)dstbuf + dstw * dsth };
+    uint8_t* src_data[8]     = { (uint8_t*)srcbuf, (uint8_t*)srcbuf + srcw * srch, (uint8_t*)srcbuf + srcw * srch };
+    int      dst_linesize[8] = { dstw, dstw / 1, dstw / 1 };
+    int      src_linesize[8] = { srcw, srcw / 1, srcw / 1 };
+    if (srcfmt == V4L2_PIX_FMT_YUYV) {
+        src_linesize[0] = srcw * 2;
+    }
+    sws_scale(cam->swsctxt, src_data, src_linesize, 0, srch, dst_data, dst_linesize);
 }
 
 static void* video_render_thread_proc(void *param)
@@ -80,11 +98,12 @@ static void* video_render_thread_proc(void *param)
         if (cam->update_flag) {
             cam->cur_win = cam->new_win;
             if (cam->cur_win != NULL) {
+                // todo usage CAMHAL_GRALLOC_USAGE
                 native_window_set_usage(cam->cur_win.get(),
                     GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_EXTERNAL_DISP);
                 native_window_set_scaling_mode  (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
                 native_window_set_buffer_count  (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
-                native_window_set_buffers_format(cam->cur_win.get(), cam->win_pixfmt);
+                native_window_set_buffers_format(cam->cur_win.get(), DEF_WIN_PIX_FMT);
             }
             cam->update_flag = 0;
         }
@@ -116,12 +135,12 @@ static void* video_render_thread_proc(void *param)
                 }
 
                 if ((err = cam->cur_win->queueBuffer(cam->cur_win.get(), buf, -1)) != 0) {
-                    ALOGW("Surface::queueBuffer returned error %d", err);
+                    ALOGW("Surface::queueBuffer returned error %d\n", err);
                 }
             }
 
             if (!len) {
-                usleep(50* 1000);
+                usleep(50 * 1000);
             }
         }
 
@@ -134,8 +153,67 @@ static void* video_render_thread_proc(void *param)
     return NULL;
 }
 
+static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
+{
+    struct v4l2_fmtdesc fmtdesc;
+    struct v4l2_format  v4l2fmt;
+    int                 find    =  0;
+    int                 ret     =  0;
+
+    fmtdesc.index = 0;
+    fmtdesc.type  = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    ALOGD("\n");
+    ALOGD("VIDIOC_ENUM_FMT   \n");
+    ALOGD("------------------\n");
+
+    while (ioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc) != -1) {
+        ALOGD("%d. flags: %d, description: %-16s, pixelfmt: 0x%0x\n",
+            fmtdesc.index, fmtdesc.flags,
+            fmtdesc.description,
+            fmtdesc.pixelformat);
+        if (fmt == (int)fmtdesc.pixelformat) {
+            find = 1;
+        }
+        fmtdesc.index++;
+    }
+    ALOGD("\n");
+
+    if (!find) {
+        ALOGD("video device can't support pixel format: 0x%0x\n", fmt);
+        return -1;
+    }
+
+    // try format
+    v4l2fmt.type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2fmt.fmt.pix.width       = *width;
+    v4l2fmt.fmt.pix.height      = *height;
+    v4l2fmt.fmt.pix.pixelformat = fmt;
+    v4l2fmt.fmt.pix.field       = V4L2_FIELD_NONE;
+
+    ALOGD("\n");
+    ALOGD("VIDIOC_ENUM_FRAMESIZES   \n");
+    ALOGD("-------------------------\n");
+
+    ret = ioctl(fd, VIDIOC_TRY_FMT, &v4l2fmt);
+    if (ret < 0)
+    {
+        ALOGE("VIDIOC_TRY_FMT Failed: %s\n", strerror(errno));
+        return ret;
+    }
+
+    // driver surpport this size
+    *width  = v4l2fmt.fmt.pix.width;
+    *height = v4l2fmt.fmt.pix.height;
+
+    ALOGD("\n");
+    ALOGD("using pixel format: 0x%0x\n", fmt);
+    ALOGD("using frame size: %d, %d\n\n", *width, *height);
+    return 0;
+}
+
 // 函数实现
-CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
+CAMCDR* camcdr_init(const char *dev, int sub, int w, int h)
 {
     CAMCDR *cam = (CAMCDR*)malloc(sizeof(CAMCDR));
     if (!cam) {
@@ -144,10 +222,6 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
 
     // init context
     memset(cam, 0, sizeof(CAMCDR));
-    cam->win_pixfmt= CAMCDE_DEF_WIN_PIXFMT;
-    cam->cam_pixfmt= fmt ? fmt : CAMCDR_DEF_CAM_PIXFMT;
-    cam->cam_w     = w   ? w   : CAMCDR_DEF_CAM_WIDTH;
-    cam->cam_h     = h   ? h   : CAMCDR_DEF_CAM_HEIGHT;
 
     // open camera device
     cam->fd = open(dev, O_RDWR);
@@ -174,72 +248,21 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
         ioctl(cam->fd, VIDIOC_S_INPUT, &input);
     }
 
-    //++ enum pixel format to find the best
-    struct v4l2_fmtdesc fmtdesc;
-    int                 find;
-    ALOGD("\n");
-    ALOGD("VIDIOC_ENUM_FMT   \n");
-    ALOGD("------------------\n");
-    find          = 0;
-    fmtdesc.index = 0;
-    fmtdesc.type  = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    while (ioctl(cam->fd, VIDIOC_ENUM_FMT, &fmtdesc) != -1) {
-        ALOGD("%d. flags: %d, description: %-16s, pixelfmt: 0x%0x\n",
-            fmtdesc.index, fmtdesc.flags,
-            fmtdesc.description,
-            fmtdesc.pixelformat);
-        if (cam->cam_pixfmt == (int)fmtdesc.pixelformat) {
-            find = 1;
-        }
-        fmtdesc.index++;
+    if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV12, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_NV12;
+        cam->cam_w      = w;
+        cam->cam_h      = h;
     }
-    if (!find) {
-        cam->cam_pixfmt = fmtdesc.pixelformat;
+    else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_NV21;
+        cam->cam_w      = w;
+        cam->cam_h      = h;
     }
-    ALOGD("\n");
-    //-- enum pixel format to find the best
-
-    //++ enum frame size to find the best
-    struct v4l2_frmsizeenum frmsize;
-    int                     mindist;
-    int                     curdist;
-    int                     bestw;
-    int                     besth;
-    mindist              = 0x7fffffff;
-    curdist              = 0;
-    bestw                = 0;
-    besth                = 0;
-    frmsize.index        = 0;
-    frmsize.pixel_format = cam->cam_pixfmt;
-    while (ioctl(cam->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) != -1) {
-        int w = 0, h = 0;
-        switch (frmsize.type) {
-        case V4L2_FRMSIZE_TYPE_DISCRETE:
-            w = frmsize.discrete.width;
-            h = frmsize.discrete.height;
-            break;
-        case V4L2_FRMSIZE_TYPE_STEPWISE:
-            w = frmsize.stepwise.max_width;
-            h = frmsize.stepwise.max_height;
-            break;
-        }
-        ALOGD("- %d, %d\n", frmsize.discrete.width, frmsize.discrete.height);
-
-        curdist = (cam->cam_w - w) * (cam->cam_w - w) + (cam->cam_h - h) * (cam->cam_h - h);
-        if (curdist < mindist) {
-            bestw = w;
-            besth = h;
-            mindist = curdist;
-        }
-        frmsize.index++;
+    else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_YUYV, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_YUYV;
+        cam->cam_w      = w;
+        cam->cam_h      = h;
     }
-    cam->cam_w = bestw;
-    cam->cam_h = besth;
-    ALOGD("\n");
-    ALOGD("using pixel format: 0x%0x\n", cam->cam_pixfmt);
-    ALOGD("using frame size: %d, %d\n", cam->cam_w, cam->cam_h);
-    ALOGD("\n");
-    //-- enum frame size to find the best
 
     struct v4l2_format v4l2fmt;
     v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -250,13 +273,13 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
     if (ioctl(cam->fd, VIDIOC_S_FMT, &v4l2fmt) != -1) {
         ALOGD("VIDIOC_S_FMT      \n");
         ALOGD("------------------\n");
-        ALOGD("width:        %d\n", v4l2fmt.fmt.pix.width       );
-        ALOGD("height:       %d\n", v4l2fmt.fmt.pix.height      );
-        ALOGD("pixfmt:       %d\n", v4l2fmt.fmt.pix.pixelformat );
-        ALOGD("field:        %d\n", v4l2fmt.fmt.pix.field       );
-        ALOGD("bytesperline: %d\n", v4l2fmt.fmt.pix.bytesperline);
-        ALOGD("sizeimage:    %d\n", v4l2fmt.fmt.pix.sizeimage   );
-        ALOGD("colorspace:   %d\n", v4l2fmt.fmt.pix.colorspace  );
+        ALOGD("width:        %d\n",    v4l2fmt.fmt.pix.width       );
+        ALOGD("height:       %d\n",    v4l2fmt.fmt.pix.height      );
+        ALOGD("pixfmt:       0x%0x\n", v4l2fmt.fmt.pix.pixelformat );
+        ALOGD("field:        %d\n",    v4l2fmt.fmt.pix.field       );
+        ALOGD("bytesperline: %d\n",    v4l2fmt.fmt.pix.bytesperline);
+        ALOGD("sizeimage:    %d\n",    v4l2fmt.fmt.pix.sizeimage   );
+        ALOGD("colorspace:   %d\n",    v4l2fmt.fmt.pix.colorspace  );
         cam->cam_stride = v4l2fmt.fmt.pix.bytesperline;
     }
     else {
@@ -286,13 +309,6 @@ CAMCDR* camcdr_init(const char *dev, int sub, int fmt, int w, int h)
         ioctl(cam->fd, VIDIOC_QBUF, &cam->buf);
     }
 
-    // init jpeg decoder
-    if (  strcmp((char*)cap.driver, "uvcvideo") == 0
-       && cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
-        cam->jpegdec   = ffjpegdec_init();
-        cam->win_pixfmt= ffjpegdec_outtype(cam->jpegdec);
-    }
-
 done:
     cam->thread_state = (1 << 1);
     pthread_create(&cam->thread_id, NULL, video_render_thread_proc, cam);
@@ -310,14 +326,14 @@ void camcdr_close(CAMCDR *cam)
     cam->thread_state |= (1 << 0);
     pthread_join(cam->thread_id, NULL);
 
-    // free jpeg decoder
-    if (cam->jpegdec) {
-        ffjpegdec_free(cam->jpegdec);
-    }
-
     // unmap buffers
     for (i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
         munmap(cam->vbs[i].addr, cam->vbs[i].len);
+    }
+
+    // free sws context
+    if (cam->swsctxt) {
+        sws_freeContext(cam->swsctxt);
     }
 
     // close & free
