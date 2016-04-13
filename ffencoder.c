@@ -40,7 +40,7 @@ typedef struct
 // 内部全局变量定义
 static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 {
-    "/data/test.mp4",   // filename
+    "/sdcard/test.mp4", // filename
     64000,              // audio_bitrate
     44100,              // sample_rate
     AV_CH_LAYOUT_STEREO,// audio stereo
@@ -426,16 +426,16 @@ void ffencoder_free(void *ctxt)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     if (!ctxt) return;
-    
+
+    /* close each codec. */
+    if (encoder->have_audio) close_astream(encoder);
+    if (encoder->have_video) close_vstream(encoder);
+
     /* write the trailer, if any. The trailer must be written before you
      * close the CodecContexts open when you wrote the header; otherwise
      * av_write_trailer() may try to use memory that was freed on
      * av_codec_close(). */
     av_write_trailer(encoder->ofctxt);
-
-    /* close each codec. */
-    if (encoder->have_video) close_astream(encoder);
-    if (encoder->have_audio) close_vstream(encoder);
 
     /* close the output file. */
     if (!(encoder->ofctxt->oformat->flags & AVFMT_NOFILE)) avio_close(encoder->ofctxt->pb);

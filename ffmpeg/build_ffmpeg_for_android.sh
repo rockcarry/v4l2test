@@ -1,7 +1,38 @@
 #!/bin/bash
+set -e
 
 EXTRA_CFLAGS="-I$PWD/include -Os -march=armv7-a -mfloat-abi=softfp -mfpu=neon -D__ARM_ARCH_7A__ -D__ANDROID__ -DNDEBUG"
 EXTRA_LDFLAGS="-L$PWD/lib -march=armv7-a"
+
+# speed of faac is slower than ffmpeg native aac encoder now
+# so we do not use faac
+if false; then
+#++ build faac ++#
+if [ ! -d faac-1.28 ]; then
+wget http://downloads.sourceforge.net/faac/faac-1.28.tar.gz
+tar xvf faac-1.28.tar.gz
+fi
+CROSS_COMPILE=arm-linux-androideabi-
+export CFLAGS="$CFLAGS"
+export CPPFLAGS="$CFLAGS"
+export CXXFLAGS="$CFLAGS"
+export LDFLAGS="$LDFLAGS"
+export CC="${CROSS_COMPILE}gcc"
+export CXX="${CROSS_COMPILE}g++"
+export NM="${CROSS_COMPILE}nm"
+export LD="${CROSS_COMPILE}ld"
+export STRIP="${CROSS_COMPILE}strip"
+export AR="${CROSS_COMPILE}ar"
+cd faac-1.28
+./configure --prefix=$PWD/.. \
+--host=arm-linux \
+--enable-static \
+--enable-shared \
+--without-mp4v2
+make -j8 && make install
+cd -
+#-- build faac --#
+fi
 
 #++ build x264 ++#
 if [ ! -d x264 ]; then
@@ -42,19 +73,9 @@ cd ffmpeg
 --disable-avfilter \
 --disable-postproc \
 --disable-everything \
---enable-encoder=mjpeg \
 --enable-encoder=libx264 \
 --enable-encoder=aac \
---enable-decoder=mjpeg \
---enable-decoder=h264 \
---enable-decoder=aac \
---enable-parser=mjpeg \
---enable-parser=h264 \
---enable-parser=aac \
---enable-demuxer=mov \
---enable-demuxer=avi \
 --enable-muxer=mp4 \
---enable-muxer=avi \
 --enable-protocol=file \
 --enable-protocol=rtmp \
 --disable-swscale-alpha \
