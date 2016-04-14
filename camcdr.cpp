@@ -62,7 +62,7 @@ static void render_v4l2(CAMCDR *cam,
         }
         switch (DEF_WIN_PIX_FMT) {
         case HAL_PIXEL_FORMAT_RGB_565:      sws_dst_fmt = AV_PIX_FMT_RGB565;  break;
-        case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_RGB32;   break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_BGR32;   break;
         case HAL_PIXEL_FORMAT_YV12:         sws_dst_fmt = AV_PIX_FMT_YUV420P; break;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP: sws_dst_fmt = AV_PIX_FMT_NV21;    break;
         }
