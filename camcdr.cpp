@@ -10,7 +10,7 @@
 
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
-#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
+#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_RGBX_8888 // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
 
 #define CAMCDR_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
                            | GRALLOC_USAGE_SW_WRITE_NEVER \
@@ -27,7 +27,9 @@ static void render_v4l2(CAMCDR *cam,
                         void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts) {
 
     DO_USE_VAR(dstlen   );
+    DO_USE_VAR(dststride);
     DO_USE_VAR(srcstride);
+    DO_USE_VAR(pts      );
 
     if (dstfmt != DEF_WIN_PIX_FMT) {
         return;
@@ -295,6 +297,23 @@ CAMCDR* camcdr_init(const char *dev, int sub, int w, int h)
         cam->fd = 0;
         goto done;
     }
+
+#if 0
+    struct v4l2_streamparm streamparam;
+    streamparam.parm.capture.timeperframe.numerator   = 1;
+    streamparam.parm.capture.timeperframe.denominator = 30;
+    streamparam.parm.capture.capturemode              = 0;
+    streamparam.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (ioctl(cam->fd, VIDIOC_S_PARM, &streamparam) != -1) {
+        ioctl(cam->fd, VIDIOC_G_PARM, &streamparam);
+        ALOGD("current camera frame rate: %d/%d !\n",
+            streamparam.parm.capture.timeperframe.denominator,
+            streamparam.parm.capture.timeperframe.numerator );
+    }
+    else {
+        ALOGW("failed to set camera frame rate !\n");
+    }
+#endif
 
     struct v4l2_requestbuffers req;
     req.count  = VIDEO_CAPTURE_BUFFER_COUNT;
