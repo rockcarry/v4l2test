@@ -16,7 +16,7 @@ static void rand_buf(void *buf, int size)
 
 int main(void)
 {
-    static uint8_t abuf[44100 / 30 * 2 * 2];
+    static uint8_t abuf[44100 / 30 * 2 * 1];
     static uint8_t vbuf[320 * 240 + 320 * 240 / 2];
     void     *encoder = NULL;
     void     *adata   [8] = { abuf };
@@ -27,9 +27,9 @@ int main(void)
     printf("encode start\n");
     FFENCODER_PARAMS param = {
         "/sdcard/test.mp4", // filename
-        128000,             // audio_bitrate
+        64000,              // audio_bitrate
         44100,              // sample_rate
-        AV_CH_LAYOUT_STEREO,// audio stereo
+        AV_CH_LAYOUT_MONO,  // audio stereo
         0,                  // start_apts
         512000,             // video_bitrate
         320,                // video_width
@@ -41,7 +41,7 @@ int main(void)
     };
     encoder = ffencoder_init(&param);
 
-    for (i=0; i<900; i++)
+    for (i=0; i<1800; i++)
     {
         rand_buf(abuf, sizeof(abuf));
         ffencoder_audio(encoder, adata, 44100/30);

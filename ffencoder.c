@@ -313,30 +313,12 @@ static void close_vstream(FFENCODER *encoder)
     sws_freeContext(encoder->sws_ctx);
 }
 
-#define ENABLE_LOG_PACKET 1
-#if ENABLE_LOG_PACKET
-static void log_packet(AVFormatContext *fmt_ctx, AVPacket *pkt)
-{
-    AVRational *time_base = &fmt_ctx->streams[pkt->stream_index]->time_base;
-
-    ALOGE("pts:%s pts_time:%s dts:%s dts_time:%s duration:%s duration_time:%s stream_index:%d\n",
-           av_ts2str(pkt->pts), av_ts2timestr(pkt->pts, time_base),
-           av_ts2str(pkt->dts), av_ts2timestr(pkt->dts, time_base),
-           av_ts2str(pkt->duration), av_ts2timestr(pkt->duration, time_base),
-           pkt->stream_index);
-}
-#endif
 
 static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
 {
     /* rescale output packet timestamp values from codec to stream timebase */
     av_packet_rescale_ts(pkt, *time_base, st->time_base);
     pkt->stream_index = st->index;
-
-#if ENABLE_LOG_PACKET
-    /* Write the compressed frame to the media file. */
-    log_packet(fmt_ctx, pkt);
-#endif
 
     /* Write the compressed frame to the media file. */
     return av_interleaved_write_frame(fmt_ctx, pkt);
@@ -427,6 +409,23 @@ void ffencoder_free(void *ctxt)
     FFENCODER *encoder = (FFENCODER*)ctxt;
     if (!ctxt) return;
 
+    AVPacket pkt = {0};
+    int      got =  0;
+
+    do {
+        avcodec_encode_audio2(encoder->astream->codec, &pkt, NULL, &got);
+        if (got) {
+            write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
+        }
+    } while (got);
+
+    do {
+        avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
+        if (got) {
+            write_frame(encoder->ofctxt, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+        }
+    } while (got);
+
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
@@ -449,19 +448,22 @@ void ffencoder_free(void *ctxt)
 
 void ffencoder_audio(void *ctxt, void *data[8], int nbsample)
 {
-    AVPacket pkt   = {0};
-    int got_packet =  0;
-    int ret        =  0;
-    int dst_nb_samples;
-    int ncopy;
-    FFENCODER *encoder = (FFENCODER*)ctxt;
+    FFENCODER *encoder    = (FFENCODER*)ctxt;
+    AVPacket   pkt        = {0};
+    int        got_packet =  0;
+    int        ret        =  0;
+    int        dst_nb_samples;
+    int        sampsize;
+    int        ncopy;
+
     if (!ctxt) return;
+    sampsize = (encoder->params.channel_layout == AV_CH_LAYOUT_STEREO ? 4 : 2);
 
     while (nbsample > 0)
     {
         ncopy = nbsample < (encoder->aframe1->nb_samples - encoder->samples_filled) ?
                 nbsample : (encoder->aframe1->nb_samples - encoder->samples_filled);
-        memcpy((int16_t*)encoder->aframe1->data[0] + 2 * encoder->samples_filled, (int16_t*)data[0], ncopy * 4);
+        memcpy(encoder->aframe1->data[0] + sampsize * encoder->samples_filled, (int16_t*)data[0], ncopy * sampsize);
         encoder->samples_filled += ncopy;
         nbsample                -= ncopy;
 
@@ -528,9 +530,6 @@ void ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     sws_scale(encoder->sws_ctx, (const uint8_t * const *)data, linesize, 0,
               encoder->vstream->codec->height, encoder->vframe->data, encoder->vframe->linesize);
     encoder->vframe->pts = encoder->next_vpts++; // pts
-
-    // init packet
-    av_init_packet(&pkt);
 
     // encode & write video
     if (encoder->ofctxt->oformat->flags & AVFMT_RAWPICTURE) {
