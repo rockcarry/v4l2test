@@ -1,5 +1,5 @@
-#ifndef __CAMCDR_H__
-#define __CAMCDR_H__
+#ifndef __CAMDEV_H__
+#define __CAMDEV_H__
 
 // 包含头文件
 #include <linux/videodev2.h>
@@ -41,15 +41,15 @@ typedef struct {
     int                     cam_w;
     int                     cam_h;
     SwsContext             *swsctxt;
-} CAMCDR;
+} CAMDEV;
 
 // 函数定义
-CAMCDR* camcdr_init (const char *dev, int sub, int w, int h);
-void    camcdr_close(CAMCDR *cam);
-void    camcdr_set_preview_window(CAMCDR *cam, const sp<ANativeWindow> win);
-void    camcdr_set_preview_target(CAMCDR *cam, const sp<IGraphicBufferProducer>& gbp);
-void    camcdr_start_preview(CAMCDR *cam);
-void    camcdr_stop_preview (CAMCDR *cam);
+CAMDEV* camdev_init (const char *dev, int sub, int w, int h);
+void    camdev_close(CAMDEV *cam);
+void    camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win);
+void    camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp);
+void    camdev_start_preview(CAMDEV *cam);
+void    camdev_stop_preview (CAMDEV *cam);
 
 #endif
 

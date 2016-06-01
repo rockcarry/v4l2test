@@ -441,7 +441,7 @@ void ffencoder_free(void *ctxt)
 
     /* free the stream */
     avformat_free_context(encoder->ofctxt);
-    
+
     // free encoder context
     free(encoder);
 }

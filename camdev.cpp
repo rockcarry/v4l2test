@@ -1,4 +1,4 @@
-#define LOG_TAG "camcdr"
+#define LOG_TAG "camdev"
 
 // 包含头文件
 #include <stdlib.h>
@@ -6,13 +6,13 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <utils/Log.h>
-#include "camcdr.h"
+#include "camdev.h"
 
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
 #define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_RGBX_8888 // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
 
-#define CAMCDR_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
+#define CAMDEV_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
                            | GRALLOC_USAGE_SW_WRITE_NEVER \
                            | GRALLOC_USAGE_HW_TEXTURE
 
@@ -22,7 +22,7 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
-static void render_v4l2(CAMCDR *cam,
+static void render_v4l2(CAMDEV *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
                         void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts) {
 
@@ -93,7 +93,7 @@ static void render_v4l2(CAMCDR *cam,
 
 static void* video_render_thread_proc(void *param)
 {
-    CAMCDR *cam = (CAMCDR*)param;
+    CAMDEV *cam = (CAMDEV*)param;
     int     err;
 
     while (1) {
@@ -109,7 +109,7 @@ static void* video_render_thread_proc(void *param)
         if (cam->update_flag) {
             cam->cur_win = cam->new_win;
             if (cam->cur_win != NULL) {
-                native_window_set_usage(cam->cur_win.get(), CAMCDR_GRALLOC_USAGE);
+                native_window_set_usage(cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
                 native_window_set_scaling_mode  (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
                 native_window_set_buffer_count  (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
                 native_window_set_buffers_format(cam->cur_win.get(), DEF_WIN_PIX_FMT);
@@ -222,15 +222,15 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
 }
 
 // 函数实现
-CAMCDR* camcdr_init(const char *dev, int sub, int w, int h)
+CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
 {
-    CAMCDR *cam = (CAMCDR*)malloc(sizeof(CAMCDR));
+    CAMDEV *cam = (CAMDEV*)malloc(sizeof(CAMDEV));
     if (!cam) {
         return NULL;
     }
 
     // init context
-    memset(cam, 0, sizeof(CAMCDR));
+    memset(cam, 0, sizeof(CAMDEV));
 
     // open camera device
     cam->fd = open(dev, O_RDWR);
@@ -342,7 +342,7 @@ done:
     return cam;
 }
 
-void camcdr_close(CAMCDR *cam)
+void camdev_close(CAMDEV *cam)
 {
     int i;
 
@@ -367,7 +367,7 @@ void camcdr_close(CAMCDR *cam)
     free(cam);
 }
 
-void camcdr_set_preview_window(CAMCDR *cam, const sp<ANativeWindow> win)
+void camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win)
 {
     if (cam) {
         cam->new_win     = win;
@@ -375,7 +375,7 @@ void camcdr_set_preview_window(CAMCDR *cam, const sp<ANativeWindow> win)
     }
 }
 
-void camcdr_set_preview_target(CAMCDR *cam, const sp<IGraphicBufferProducer>& gbp)
+void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp)
 {
     sp<ANativeWindow> win;
     if (gbp != 0) {
@@ -384,10 +384,10 @@ void camcdr_set_preview_target(CAMCDR *cam, const sp<IGraphicBufferProducer>& gb
         // on that behavior.
         win = new Surface(gbp, /*controlledByApp*/ true);
     }
-    camcdr_set_preview_window(cam, win);
+    camdev_set_preview_window(cam, win);
 }
 
-void camcdr_start_preview(CAMCDR *cam)
+void camdev_start_preview(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
@@ -398,7 +398,7 @@ void camcdr_start_preview(CAMCDR *cam)
     cam->thread_state &= ~(1 << 1);
 }
 
-void camcdr_stop_preview(CAMCDR *cam)
+void camdev_stop_preview(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {

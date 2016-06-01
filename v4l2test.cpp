@@ -1,9 +1,9 @@
 #include <cutils/properties.h>
-#include "camcdr.h"
+#include "camdev.h"
 
 int main(int argc, char *argv[])
 {
-    CAMCDR *cam = NULL;
+    CAMDEV *cam = NULL;
     char    dev[32] = "/dev/video0";
     int     sub     = 0;
     int     w       = 640;
@@ -44,12 +44,12 @@ int main(int argc, char *argv[])
     sp<ANativeWindow> win = surface;
     native_window_set_buffers_dimensions(win.get(), dinfo.w, dinfo.h);
 
-    // init camcdr
-    cam = camcdr_init(dev, sub, w, h);
+    // init camdev
+    cam = camdev_init(dev, sub, w, h);
 
     // startpreview
-    camcdr_set_preview_window(cam, win);
-    camcdr_start_preview(cam);
+    camdev_set_preview_window(cam, win);
+    camdev_start_preview(cam);
 
     // wait exit
     while (1) {
@@ -62,10 +62,10 @@ int main(int argc, char *argv[])
     }
 
     // stoppreview
-    camcdr_stop_preview(cam);
+    camdev_stop_preview(cam);
 
-    // close camcdr
-    camcdr_close(cam);
+    // close camdev
+    camdev_close(cam);
 
     return 0;
 }
