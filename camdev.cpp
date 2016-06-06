@@ -91,7 +91,7 @@ static void render_v4l2(CAMDEV *cam,
     sws_scale(cam->swsctxt, src_data, src_linesize, 0, srch, dst_data, dst_linesize);
 }
 
-static void* video_render_thread_proc(void *param)
+static void* camdev_capture_thread_proc(void *param)
 {
     CAMDEV *cam = (CAMDEV*)param;
     int     err;
@@ -343,7 +343,7 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
     }
 
 done:
-    pthread_create(&cam->thread_id, NULL, video_render_thread_proc, cam);
+    pthread_create(&cam->thread_id, NULL, camdev_capture_thread_proc, cam);
 
     return cam;
 }
