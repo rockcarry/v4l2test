@@ -10,7 +10,8 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
 LOCAL_SRC_FILES := \
     v4l2test.cpp \
-    camdev.cpp
+    camdev.cpp \
+    micdev.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \

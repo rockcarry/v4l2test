@@ -97,12 +97,12 @@ static void* video_render_thread_proc(void *param)
     int     err;
 
     while (1) {
-        if (cam->thread_state & (1 << 0)) {
+        if (cam->thread_state & CAMDEV_TS_EXIT) {
             break;
         }
 
-        if (cam->thread_state & (1 << 1)) {
-            usleep(10*1000);
+        if (cam->thread_state & CAMDEV_TS_PAUSE) {
+            usleep(33*1000);
             continue;
         }
 
@@ -124,7 +124,7 @@ static void* video_render_thread_proc(void *param)
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
 //              cam->buf.sequence, cam->buf.length);
-
+        if (cam->thread_state & CAMDEV_TS_PREVIEW)
         {
             int   pts  = (int)(cam->buf.timestamp.tv_usec + cam->buf.timestamp.tv_sec * 1000000);
             char *data = (char*)cam->vbs[cam->buf.index].addr;
@@ -149,7 +149,14 @@ static void* video_render_thread_proc(void *param)
             }
 
             if (!len) {
-                usleep(50 * 1000);
+                usleep(33 * 1000);
+            }
+        }
+
+        if (cam->thread_state & CAMDEV_TS_ENCODE)
+        {
+            if (cam->encoder) {
+                // todo...
             }
         }
 
@@ -336,7 +343,6 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
     }
 
 done:
-    cam->thread_state = (1 << 1);
     pthread_create(&cam->thread_id, NULL, video_render_thread_proc, cam);
 
     return cam;
@@ -349,7 +355,7 @@ void camdev_close(CAMDEV *cam)
     if (!cam) return;
 
     // wait thread safely exited
-    cam->thread_state |= (1 << 0);
+    cam->thread_state |= CAMDEV_TS_EXIT;
     pthread_join(cam->thread_id, NULL);
 
     // unmap buffers
@@ -395,7 +401,7 @@ void camdev_start_preview(CAMDEV *cam)
     }
 
     // start thread
-    cam->thread_state &= ~(1 << 1);
+    cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
 void camdev_stop_preview(CAMDEV *cam)
@@ -406,7 +412,11 @@ void camdev_stop_preview(CAMDEV *cam)
     }
 
     // pause thread
-    cam->thread_state |= ~(1 << 1);
+    cam->thread_state &= ~CAMDEV_TS_PREVIEW;
 }
 
+void camdev_set_encoder(CAMDEV *cam, void *encoder)
+{
+    cam->encoder = encoder;
+}
 

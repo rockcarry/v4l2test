@@ -34,6 +34,10 @@ typedef struct {
     int                     win_w;
     int                     win_h;
     pthread_t               thread_id;
+    #define CAMDEV_TS_EXIT      (1 << 0)
+    #define CAMDEV_TS_PAUSE     (1 << 1)
+    #define CAMDEV_TS_PREVIEW   (1 << 2)
+    #define CAMDEV_TS_ENCODE    (1 << 3)
     int                     thread_state;
     int                     update_flag;
     int                     cam_pixfmt;
@@ -41,6 +45,7 @@ typedef struct {
     int                     cam_w;
     int                     cam_h;
     SwsContext             *swsctxt;
+    void                   *encoder;
 } CAMDEV;
 
 // º¯Êý¶¨Òå
@@ -50,6 +55,7 @@ void    camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win);
 void    camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp);
 void    camdev_start_preview(CAMDEV *cam);
 void    camdev_stop_preview (CAMDEV *cam);
+void    camdev_set_encoder  (CAMDEV *cam, void *encoder);
 
 #endif
 
