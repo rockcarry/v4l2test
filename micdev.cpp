@@ -3,6 +3,7 @@
 // 包含头文件
 #include <stdlib.h>
 #include <utils/Log.h>
+#include "ffencoder.h"
 #include "micdev.h"
 
 // 内部常量定义
@@ -37,7 +38,11 @@ static void* micdev_capture_thread_proc(void *param)
 #endif
 
         if (dev->encoder) {
-            // todo..
+            void *data[8] = { dev->buffer };
+            int   sampnum = dev->buflen / (2 * DEF_PCM_CHANNEL);
+            if (0 != ffencoder_audio(dev->encoder, data, sampnum)) {
+                ALOGD("encoder drop audio frame !\n");
+            }
         }
     }
 

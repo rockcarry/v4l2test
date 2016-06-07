@@ -13,7 +13,8 @@ LOCAL_C_INCLUDES := external/tinyalsa/include
 LOCAL_SRC_FILES := \
     v4l2test.cpp \
     camdev.cpp \
-    micdev.cpp
+    micdev.cpp \
+    ffencoder.c
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \

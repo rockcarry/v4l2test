@@ -26,18 +26,30 @@ int main(void)
 
     printf("encode start\n");
     FFENCODER_PARAMS param = {
+        // input params
+        AV_CH_LAYOUT_MONO,  // in_audio_channel_layout
+        AV_SAMPLE_FMT_S16,  // in_audio_sample_fmt
+        44100,              // in_audio_sample_rate
+        320,                // in_video_width
+        240,                // in_video_height
+        AV_PIX_FMT_YUYV422, // in_video_pixfmt
+
+        // output params
         "/sdcard/test.mp4", // filename
-        64000,              // audio_bitrate
-        44100,              // sample_rate
-        AV_CH_LAYOUT_MONO,  // audio stereo
+        32000,              // out_audio_bitrate
+        AV_CH_LAYOUT_MONO,  // out_audio_channel_layout
+        44100,              // out_audio_sample_rate
+        256000,             // out_video_bitrate
+        320,                // out_video_width
+        240,                // out_video_height
+        20,                 // out_video_frame_rate
+
+        // other params
         0,                  // start_apts
-        512000,             // video_bitrate
-        320,                // video_width
-        240,                // video_height
-        30,                 // frame_rate
-        AV_PIX_FMT_YUV420P, // pixel_fmt
-        SWS_POINT,          // scale_flags
         0,                  // start_vpts
+        SWS_POINT,          // scale_flags
+        5,                  // audio_buffer_number
+        5,                  // video_buffer_number
     };
     encoder = ffencoder_init(&param);
 

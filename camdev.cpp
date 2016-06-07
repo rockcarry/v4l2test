@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <utils/Log.h>
+#include "ffencoder.h"
 #include "camdev.h"
 
 // 内部常量定义
@@ -154,7 +155,17 @@ static void* camdev_capture_thread_proc(void *param)
         }
 
         if (cam->encoder) {
-            // todo..
+            int      camw        = cam->cam_w;
+            int      camh        = cam->cam_h;
+            uint8_t *cbuf        = (uint8_t*)cam->vbs[cam->buf.index].addr;
+            void    *data[8]     = { (uint8_t*)cbuf, (uint8_t*)cbuf + camw * camh, (uint8_t*)cbuf + camw * camh };
+            int      linesize[8] = { camw, camw / 1, camw / 1 };
+            if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
+                linesize[0] = camw * 2;
+            }
+            if (0 != ffencoder_video(cam->encoder, data, linesize)) {
+                ALOGD("encoder drop video frame !\n");
+            }
         }
 
         // requeue camera video buffer
