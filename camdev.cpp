@@ -24,8 +24,8 @@ static int ALIGN(int x, int y) {
 
 static void render_v4l2(CAMDEV *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
-                        void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts) {
-
+                        void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts)
+{
     DO_USE_VAR(dstlen   );
     DO_USE_VAR(dststride);
     DO_USE_VAR(srcstride);
@@ -153,11 +153,8 @@ static void* camdev_capture_thread_proc(void *param)
             }
         }
 
-        if (cam->thread_state & CAMDEV_TS_ENCODE)
-        {
-            if (cam->encoder) {
-                // todo...
-            }
+        if (cam->encoder) {
+            // todo..
         }
 
         // requeue camera video buffer

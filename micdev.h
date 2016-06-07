@@ -9,11 +9,11 @@ typedef struct {
     struct pcm       *pcm;
     uint8_t          *buffer;
     int               buflen;
-    pthread_t               thread_id;
-    #define MICDEV_TS_EXIT      (1 << 0)
-    #define MICDEV_TS_PAUSE     (1 << 1)
-    #define MICDEV_TS_ENCODE    (1 << 2)
-    int                     thread_state;
+    #define MICDEV_TS_EXIT  (1 << 0)
+    #define MICDEV_TS_PAUSE (1 << 1)
+    pthread_t         thread_id;
+    int               thread_state;
+    void             *encoder;
 } MICDEV;
 
 // º¯Êý¶¨Òå

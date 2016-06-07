@@ -8,7 +8,7 @@
 // 内部常量定义
 #define DEF_PCM_CARD      0
 #define DEF_PCM_DEVICE    0
-#define DEF_PCM_CHANNEL   1
+#define DEF_PCM_CHANNEL   2
 #define DEF_PCM_SAMPRATE  44100
 #define DEF_PCM_FORMAT    PCM_FORMAT_S16_LE
 #define DEF_PCM_BUF_SIZE  2048
@@ -27,6 +27,17 @@ static void* micdev_capture_thread_proc(void *param)
         if (dev->thread_state & MICDEV_TS_PAUSE) {
             usleep(33*1000);
             continue;
+        }
+
+        // read data from pcm
+#if 0
+        pcm_read(dev->pcm, dev->buffer, dev->buflen);
+#else
+        pcm_read_ex(dev->pcm, dev->buffer, dev->buflen);
+#endif
+
+        if (dev->encoder) {
+            // todo..
         }
     }
 
@@ -90,7 +101,20 @@ void micdev_close(MICDEV *dev)
     free(dev);
 }
 
-void micdev_start_capture(MICDEV *dev) {}
-void micdev_stop_capture (MICDEV *dev) {}
-void micdev_set_encoder  (MICDEV *dev, void *encoder) {}
+void micdev_start_capture(MICDEV *dev)
+{
+    // start capture
+    dev->thread_state &= ~MICDEV_TS_PAUSE;
+}
+
+void micdev_stop_capture(MICDEV *dev)
+{
+    // stop capture
+    dev->thread_state |= MICDEV_TS_PAUSE;
+}
+
+void micdev_set_encoder(MICDEV *dev, void *encoder)
+{
+    dev->encoder = encoder;
+}
 

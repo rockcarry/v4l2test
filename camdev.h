@@ -33,11 +33,10 @@ typedef struct {
     sp<ANativeWindow>       cur_win;
     int                     win_w;
     int                     win_h;
+    #define CAMDEV_TS_EXIT    (1 << 0)
+    #define CAMDEV_TS_PAUSE   (1 << 1)
+    #define CAMDEV_TS_PREVIEW (1 << 2)
     pthread_t               thread_id;
-    #define CAMDEV_TS_EXIT      (1 << 0)
-    #define CAMDEV_TS_PAUSE     (1 << 1)
-    #define CAMDEV_TS_PREVIEW   (1 << 2)
-    #define CAMDEV_TS_ENCODE    (1 << 3)
     int                     thread_state;
     int                     update_flag;
     int                     cam_pixfmt;
