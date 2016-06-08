@@ -23,7 +23,8 @@ typedef struct
     AVStream          *astream;
     AVFrame           *aframes;
     int64_t            next_apts;
-    int                samples_filled;
+    uint8_t           *adatacur[8];
+    int                asamplenum;
     sem_t              asemr;
     sem_t              asemw;
     int                ahead;
@@ -81,9 +82,23 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 };
 
 // 内部函数实现
+static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
+{
+    /* rescale output packet timestamp values from codec to stream timebase */
+    av_packet_rescale_ts(pkt, *time_base, st->time_base);
+    pkt->stream_index = st->index;
+
+    /* Write the compressed frame to the media file. */
+    return av_interleaved_write_frame(fmt_ctx, pkt);
+}
+
 static void* audio_encode_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
+    AVFrame   *aframe  = NULL;
+    AVPacket   pkt     = {0};
+    int        got     =  0;
+    int        ret     =  0;
 
     while (1) {
         if (encoder->thread_state & FFENCODER_TS_EXIT) {
@@ -94,10 +109,39 @@ static void* audio_encode_thread_proc(void *param)
             usleep(33*1000);
             continue;
         }
+        else {
+            aframe = &encoder->aframes[encoder->ahead];
+        }
 
-        // encode audio and write to file
-        // todo...
+        /* when we pass a frame to the encoder, it may keep a reference to it
+         * internally;
+         * make sure we do not overwrite it here
+         */
+        ret = av_frame_make_writable(aframe);
+        if (ret < 0) {
+            ALOGE("failed to make aframe writable !\n");
+            exit(1);
+        }
 
+        // encode audio
+        ret = avcodec_encode_audio2(encoder->astream->codec, &pkt, aframe, &got);
+        if (ret < 0) {
+            ALOGE("error encoding audio frame: %s\n", av_err2str(ret));
+            exit(1);
+        }
+
+        // write audio
+        if (got) {
+            ret = write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
+            if (ret < 0) {
+                ALOGE("error while writing audio frame: %s\n", av_err2str(ret));
+                exit(1);
+            }
+        }
+
+        if (++encoder->ahead == encoder->params.audio_buffer_number) {
+            encoder->ahead = 0;
+        }
         sem_post(&encoder->asemw);
     }
 
@@ -107,6 +151,10 @@ static void* audio_encode_thread_proc(void *param)
 static void* video_encode_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
+    AVFrame   *vframe  = NULL;
+    AVPacket   pkt     = {0};
+    int        got     =  0;
+    int        ret     =  0;
 
     while (1) {
         if (encoder->thread_state & FFENCODER_TS_EXIT) {
@@ -117,10 +165,50 @@ static void* video_encode_thread_proc(void *param)
             usleep(33*1000);
             continue;
         }
+        else {
+            vframe = &encoder->vframes[encoder->vhead];
+        }
 
-        // encode video and write to file
-        // todo...
+        // encode & write video
+        if (encoder->ofctxt->oformat->flags & AVFMT_RAWPICTURE) {
+            /* a hack to avoid data copy with some raw video muxers */
+            pkt.flags |= AV_PKT_FLAG_KEY;
+            pkt.data   = (uint8_t*)vframe;
+            pkt.size   = sizeof(AVPicture);
+            pkt.pts    = vframe->pts;
+            pkt.dts    = vframe->pts;
+            ret = write_frame(encoder->ofctxt, &(encoder->vstream->codec->time_base), encoder->vstream, &pkt);
+        } else {
+            /* when we pass a frame to the encoder, it may keep a reference to it
+             * internally;
+             * make sure we do not overwrite it here
+             */
+            ret = av_frame_make_writable(vframe);
+            if (ret < 0) {
+                ALOGE("failed to make vframe writable !\n");
+                exit(1);
+            }
 
+            /* encode the image */
+            ret = avcodec_encode_video2(encoder->vstream->codec, &pkt, vframe, &got);
+            if (ret < 0) {
+                ALOGE("error encoding video frame: %s\n", av_err2str(ret));
+                exit(1);
+            }
+
+            if (got) {
+                ret = write_frame(encoder->ofctxt, &(encoder->vstream->codec->time_base), encoder->vstream, &pkt);
+            }
+        }
+
+        if (ret < 0) {
+            ALOGE("error while writing video frame: %s\n", av_err2str(ret));
+            exit(1);
+        }
+
+        if (++encoder->vhead == encoder->params.video_buffer_number) {
+            encoder->vhead = 0;
+        }
         sem_post(&encoder->vsemw);
     }
 
@@ -399,7 +487,7 @@ static void close_astream(FFENCODER *encoder)
     //-- for audio frames
 
     avcodec_close(encoder->astream->codec);
-    swr_free(&(encoder->swr_ctx));
+    swr_free(&encoder->swr_ctx);
 }
 
 static void close_vstream(FFENCODER *encoder)
@@ -422,17 +510,6 @@ static void close_vstream(FFENCODER *encoder)
 
     avcodec_close(encoder->vstream->codec);
     sws_freeContext(encoder->sws_ctx);
-}
-
-
-static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
-{
-    /* rescale output packet timestamp values from codec to stream timebase */
-    av_packet_rescale_ts(pkt, *time_base, st->time_base);
-    pkt->stream_index = st->index;
-
-    /* Write the compressed frame to the media file. */
-    return av_interleaved_write_frame(fmt_ctx, pkt);
 }
 
 
@@ -467,7 +544,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
     if (!params->audio_buffer_number     ) params->audio_buffer_number     = DEF_FFENCODER_PARAMS.audio_buffer_number;
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
-    memcpy(&(encoder->params), params, sizeof(FFENCODER_PARAMS));
+    memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
     encoder->next_apts = params->start_apts;
     encoder->next_vpts = params->start_vpts;
 
@@ -475,7 +552,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     av_register_all();
 
     /* allocate the output media context */
-    avformat_alloc_output_context2(&(encoder->ofctxt), NULL, NULL, params->out_filename);
+    avformat_alloc_output_context2(&encoder->ofctxt, NULL, NULL, params->out_filename);
     if (!encoder->ofctxt)
     {
         ALOGE("could not deduce output format from file extension: using MPEG.\n");
@@ -511,7 +588,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     }
 
     /* write the stream header, if any. */
-    ret = avformat_write_header(encoder->ofctxt, &(encoder->avopt));
+    ret = avformat_write_header(encoder->ofctxt, &encoder->avopt);
     if (ret < 0) {
         ALOGE("error occurred when opening output file: %s\n", av_err2str(ret));
         goto failed;
@@ -570,30 +647,62 @@ void ffencoder_free(void *ctxt)
 int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
+    AVFrame   *aframe  = NULL;
+    int        sampnum, i;
+
     if (!ctxt) return -1;
 
-    if (sem_trywait(&encoder->asemw) != 0) {
-        return -1;
-    }
+    do {
+        // resample audio
+        if (encoder->asamplenum == 0) {
+            if (sem_trywait(&encoder->asemw) != 0) {
+                return -1;
+            }
+            else {
+                aframe = &encoder->aframes[encoder->atail];
+            }
 
-    // resample audio
-    // todo..
+            for (i=0; i<8; i++) {
+                encoder->adatacur[i] = aframe->data[i];
+            }
+            encoder->asamplenum = aframe->nb_samples;
+        }
 
-    if (++encoder->atail == encoder->params.audio_buffer_number) {
-        encoder->atail = 0;
-    }
+        sampnum  = swr_convert(encoder->swr_ctx, encoder->adatacur,
+                        encoder->asamplenum, (const uint8_t**)data, nbsample);
+        data     = NULL;
+        nbsample = 0;
+        for (i=0; i<8; i++) {
+            encoder->adatacur[i] += sampnum * encoder->astream->codec->channels * 2;
+        }
+        encoder->asamplenum -= sampnum;
 
-    sem_post(&encoder->asemr);
+        if (encoder->asamplenum == 0) {
+            aframe->pts = av_rescale_q(encoder->next_apts,
+                (AVRational){1, encoder->astream->codec->sample_rate}, encoder->astream->codec->time_base);
+            encoder->next_apts += aframe->nb_samples;
+
+            if (++encoder->atail == encoder->params.audio_buffer_number) {
+                encoder->atail = 0;
+            }
+            sem_post(&encoder->asemr);
+        }
+    } while (sampnum > 0);
+
     return 0;
 }
 
 int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
+    AVFrame   *vframe  = NULL;
     if (!ctxt) return -1;
 
     if (sem_trywait(&encoder->vsemw) != 0) {
         return -1;
+    }
+    else {
+        vframe = &encoder->vframes[encoder->vtail];
     }
 
     // scale video image
@@ -603,8 +712,9 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
         linesize,
         0,
         encoder->params.out_video_height,
-        encoder->vframes[encoder->vtail].data,
-        encoder->vframes[encoder->vtail].linesize);
+        vframe->data,
+        vframe->linesize);
+    vframe->pts = encoder->next_vpts++;
 
     if (++encoder->vtail == encoder->params.video_buffer_number) {
         encoder->vtail = 0;
