@@ -1,15 +1,14 @@
 // 包含头文件
 #include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <libavutil/opt.h>
-#include <libavutil/avassert.h>
-#include <libavutil/timestamp.h>
+#include <libavutil/avutil.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
-#include <utils/Log.h>
 #include "ffencoder.h"
 
 // 内部类型定义
@@ -23,6 +22,7 @@ typedef struct
     AVStream          *astream;
     AVFrame           *aframes;
     int64_t            next_apts;
+    AVFrame           *aframecur;
     uint8_t           *adatacur[8];
     int                asamplenum;
     sem_t              asemr;
@@ -101,32 +101,17 @@ static void* audio_encode_thread_proc(void *param)
     int        ret     =  0;
 
     while (1) {
+        sem_wait(&encoder->asemr);
+        aframe = &encoder->aframes[encoder->ahead];
+
         if (encoder->thread_state & FFENCODER_TS_EXIT) {
             break;
-        }
-
-        if (0 != sem_trywait(&encoder->asemr)) {
-            usleep(33*1000);
-            continue;
-        }
-        else {
-            aframe = &encoder->aframes[encoder->ahead];
-        }
-
-        /* when we pass a frame to the encoder, it may keep a reference to it
-         * internally;
-         * make sure we do not overwrite it here
-         */
-        ret = av_frame_make_writable(aframe);
-        if (ret < 0) {
-            ALOGE("failed to make aframe writable !\n");
-            exit(1);
         }
 
         // encode audio
         ret = avcodec_encode_audio2(encoder->astream->codec, &pkt, aframe, &got);
         if (ret < 0) {
-            ALOGE("error encoding audio frame: %s\n", av_err2str(ret));
+            printf("error encoding audio frame !\n");
             exit(1);
         }
 
@@ -134,7 +119,7 @@ static void* audio_encode_thread_proc(void *param)
         if (got) {
             ret = write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
             if (ret < 0) {
-                ALOGE("error while writing audio frame: %s\n", av_err2str(ret));
+                printf("error while writing audio frame !\n");
                 exit(1);
             }
         }
@@ -144,6 +129,13 @@ static void* audio_encode_thread_proc(void *param)
         }
         sem_post(&encoder->asemw);
     }
+
+    do {
+        avcodec_encode_audio2(encoder->astream->codec, &pkt, NULL, &got);
+        if (got) {
+            write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
+        }
+    } while (got);
 
     return NULL;
 }
@@ -157,16 +149,11 @@ static void* video_encode_thread_proc(void *param)
     int        ret     =  0;
 
     while (1) {
+        sem_wait(&encoder->vsemr);
+        vframe = &encoder->vframes[encoder->vhead];
+
         if (encoder->thread_state & FFENCODER_TS_EXIT) {
             break;
-        }
-
-        if (0 != sem_trywait(&encoder->vsemr)) {
-            usleep(33*1000);
-            continue;
-        }
-        else {
-            vframe = &encoder->vframes[encoder->vhead];
         }
 
         // encode & write video
@@ -179,20 +166,10 @@ static void* video_encode_thread_proc(void *param)
             pkt.dts    = vframe->pts;
             ret = write_frame(encoder->ofctxt, &(encoder->vstream->codec->time_base), encoder->vstream, &pkt);
         } else {
-            /* when we pass a frame to the encoder, it may keep a reference to it
-             * internally;
-             * make sure we do not overwrite it here
-             */
-            ret = av_frame_make_writable(vframe);
-            if (ret < 0) {
-                ALOGE("failed to make vframe writable !\n");
-                exit(1);
-            }
-
             /* encode the image */
             ret = avcodec_encode_video2(encoder->vstream->codec, &pkt, vframe, &got);
             if (ret < 0) {
-                ALOGE("error encoding video frame: %s\n", av_err2str(ret));
+                printf("error encoding video frame !\n");
                 exit(1);
             }
 
@@ -202,7 +179,7 @@ static void* video_encode_thread_proc(void *param)
         }
 
         if (ret < 0) {
-            ALOGE("error while writing video frame: %s\n", av_err2str(ret));
+            printf("error while writing video frame !\n");
             exit(1);
         }
 
@@ -211,6 +188,13 @@ static void* video_encode_thread_proc(void *param)
         }
         sem_post(&encoder->vsemw);
     }
+
+    do {
+        avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
+        if (got) {
+            write_frame(encoder->ofctxt, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+        }
+    } while (got);
 
     return NULL;
 }
@@ -225,13 +209,13 @@ static int add_astream(FFENCODER *encoder)
 
     encoder->acodec = avcodec_find_encoder(codec_id);
     if (!encoder->acodec) {
-        ALOGE("could not find encoder for '%s'\n", avcodec_get_name(codec_id));
+        printf("could not find encoder for '%s'\n", avcodec_get_name(codec_id));
         return -1;
     }
 
     encoder->astream = avformat_new_stream(encoder->ofctxt, encoder->acodec);
     if (!encoder->astream) {
-        ALOGE("could not allocate stream\n");
+        printf("could not allocate stream\n");
         return -1;
     }
 
@@ -260,7 +244,8 @@ static int add_astream(FFENCODER *encoder)
         }
     }
     c->channels = av_get_channel_layout_nb_channels(c->channel_layout);
-    encoder->astream->time_base = (AVRational){ 1, c->sample_rate };
+    encoder->astream->time_base.num = 1;
+    encoder->astream->time_base.den = c->sample_rate;
 
     /* some formats want stream headers to be separate. */
     if (encoder->ofctxt->oformat->flags & AVFMT_GLOBALHEADER)
@@ -279,13 +264,13 @@ static int add_vstream(FFENCODER *encoder)
 
     encoder->vcodec = avcodec_find_encoder(codec_id);
     if (!encoder->vcodec) {
-        ALOGE("could not find encoder for '%s'\n", avcodec_get_name(codec_id));
+        printf("could not find encoder for '%s'\n", avcodec_get_name(codec_id));
         return -1;
     }
 
     encoder->vstream = avformat_new_stream(encoder->ofctxt, encoder->vcodec);
     if (!encoder->vstream) {
-        ALOGE("could not allocate stream\n");
+        printf("could not allocate stream\n");
         return -1;
     }
 
@@ -301,7 +286,8 @@ static int add_vstream(FFENCODER *encoder)
      * of which frame timestamps are represented. For fixed-fps content,
      * timebase should be 1/framerate and timestamp increments should be
      * identical to 1. */
-    encoder->vstream->time_base = (AVRational){ 1, encoder->params.out_video_frame_rate };
+    encoder->vstream->time_base.num = 1;
+    encoder->vstream->time_base.den = encoder->params.out_video_frame_rate;
     c->time_base = encoder->vstream->time_base;
     c->gop_size  = 12; /* emit one intra frame every twelve frames at most */
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
@@ -336,7 +322,7 @@ static void alloc_audio_frame(AVFrame *frame, enum AVSampleFormat sample_fmt, ui
     if (nb_samples) {
         ret = av_frame_get_buffer(frame, 0);
         if (ret < 0) {
-            ALOGE("error allocating an audio buffer\n");
+            printf("error allocating an audio buffer\n");
             exit(1);
         }
     }
@@ -359,14 +345,14 @@ static void open_audio(FFENCODER *encoder)
     ret = avcodec_open2(c, codec, &opt);
     av_dict_free(&opt);
     if (ret < 0) {
-        ALOGE("could not open audio codec: %s\n", av_err2str(ret));
+        printf("could not open audio codec !\n");
         exit(1);
     }
 
     /* create resampler context */
     encoder->swr_ctx = swr_alloc();
     if (!encoder->swr_ctx) {
-        ALOGE("could not allocate resampler context\n");
+        printf("could not allocate resampler context\n");
         exit(1);
     }
 
@@ -380,14 +366,17 @@ static void open_audio(FFENCODER *encoder)
 
     /* initialize the resampling context */
     if ((ret = swr_init(encoder->swr_ctx)) < 0) {
-        ALOGE("failed to initialize the resampling context\n");
+        printf("failed to initialize the resampling context\n");
         exit(1);
     }
 
     encoder->aframes = (AVFrame*)malloc(sizeof(AVFrame) * encoder->params.audio_buffer_number);
     if (!encoder->aframes) {
-        ALOGE("failed to allocate memory for aframes !\n");
+        printf("failed to allocate memory for aframes !\n");
         exit(1);
+    }
+    else {
+        memset(encoder->aframes, 0, sizeof(AVFrame) * encoder->params.audio_buffer_number);
     }
     for (i=0; i<encoder->params.audio_buffer_number; i++) {
         alloc_audio_frame(&encoder->aframes[i],
@@ -415,7 +404,7 @@ static void alloc_picture(AVFrame *picture, enum AVPixelFormat pix_fmt, int widt
     /* allocate the buffers for the frame data */
     ret = av_frame_get_buffer(picture, 32);
     if (ret < 0) {
-        ALOGE("could not allocate frame data.\n");
+        printf("could not allocate frame data.\n");
         exit(1);
     }
 }
@@ -434,7 +423,7 @@ static void open_video(FFENCODER *encoder)
     ret = avcodec_open2(c, codec, &opt);
     av_dict_free(&opt);
     if (ret < 0) {
-        ALOGE("could not open video codec: %s\n", av_err2str(ret));
+        printf("could not open video codec !\n");
         exit(1);
     }
 
@@ -448,14 +437,17 @@ static void open_video(FFENCODER *encoder)
         encoder->params.scale_flags,
         NULL, NULL, NULL);
     if (!encoder->sws_ctx) {
-        ALOGE("could not initialize the conversion context\n");
+        printf("could not initialize the conversion context\n");
         exit(1);
     }
 
     encoder->vframes = (AVFrame*)malloc(sizeof(AVFrame) * encoder->params.video_buffer_number);
     if (!encoder->vframes) {
-        ALOGE("failed to allocate memory for vframes !\n");
+        printf("failed to allocate memory for vframes !\n");
         exit(1);
+    }
+    else {
+        memset(encoder->vframes, 0, sizeof(AVFrame) * encoder->params.video_buffer_number);
     }
     for (i=0; i<encoder->params.video_buffer_number; i++) {
         alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
@@ -473,6 +465,7 @@ static void close_astream(FFENCODER *encoder)
     int i;
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
+    sem_post(&encoder->asemr);
     pthread_join(encoder->aencode_thread_id, NULL);
 
     sem_destroy(&encoder->asemr);
@@ -480,8 +473,7 @@ static void close_astream(FFENCODER *encoder)
 
     //++ for audio frames
     for (i=0; i<encoder->params.audio_buffer_number; i++) {
-        AVFrame *frame = &encoder->aframes[i];
-        av_frame_free(&frame);
+        av_frame_unref(&encoder->aframes[i]);
     }
     free(encoder->aframes);
     //-- for audio frames
@@ -495,6 +487,7 @@ static void close_vstream(FFENCODER *encoder)
     int i;
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
+    sem_post(&encoder->vsemr);
     pthread_join(encoder->vencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);
@@ -519,7 +512,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     int ret;
 
     // allocate context for ffencoder
-    FFENCODER *encoder = malloc(sizeof(FFENCODER));
+    FFENCODER *encoder = (FFENCODER*)malloc(sizeof(FFENCODER));
     if (encoder) memset(encoder, 0, sizeof(FFENCODER));
     else return NULL;
 
@@ -555,7 +548,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     avformat_alloc_output_context2(&encoder->ofctxt, NULL, NULL, params->out_filename);
     if (!encoder->ofctxt)
     {
-        ALOGE("could not deduce output format from file extension: using MPEG.\n");
+        printf("could not deduce output format from file extension: using MPEG.\n");
         goto failed;
     }
 
@@ -563,13 +556,13 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
      * and initialize the codecs. */
     if (add_astream(encoder) < 0)
     {
-        ALOGE("failed to add audio stream.\n");
+        printf("failed to add audio stream.\n");
         goto failed;
     }
 
     if (add_vstream(encoder) < 0)
     {
-        ALOGE("failed to add video stream.\n");
+        printf("failed to add video stream.\n");
         goto failed;
     }
 
@@ -582,7 +575,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!(encoder->ofctxt->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&encoder->ofctxt->pb, params->out_filename, AVIO_FLAG_WRITE);
         if (ret < 0) {
-            ALOGE("could not open '%s': %s\n", params->out_filename, av_err2str(ret));
+            printf("could not open '%s' !\n", params->out_filename);
             goto failed;
         }
     }
@@ -590,7 +583,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     /* write the stream header, if any. */
     ret = avformat_write_header(encoder->ofctxt, &encoder->avopt);
     if (ret < 0) {
-        ALOGE("error occurred when opening output file: %s\n", av_err2str(ret));
+        printf("error occurred when opening output file !\n");
         goto failed;
     }
 
@@ -609,20 +602,6 @@ void ffencoder_free(void *ctxt)
 
     AVPacket pkt = {0};
     int      got =  0;
-
-    do {
-        avcodec_encode_audio2(encoder->astream->codec, &pkt, NULL, &got);
-        if (got) {
-            write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
-        }
-    } while (got);
-
-    do {
-        avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
-        if (got) {
-            write_frame(encoder->ofctxt, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
-        }
-    } while (got);
 
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);
@@ -649,23 +628,20 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *aframe  = NULL;
     int        sampnum, i;
-
     if (!ctxt) return -1;
 
     do {
         // resample audio
         if (encoder->asamplenum == 0) {
-            if (sem_trywait(&encoder->asemw) != 0) {
-                return -1;
-            }
-            else {
-                aframe = &encoder->aframes[encoder->atail];
-            }
-
+            sem_wait(&encoder->asemw);
+            aframe = encoder->aframecur = &encoder->aframes[encoder->atail];
             for (i=0; i<8; i++) {
                 encoder->adatacur[i] = aframe->data[i];
             }
             encoder->asamplenum = aframe->nb_samples;
+        }
+        else {
+            aframe = encoder->aframecur;
         }
 
         sampnum  = swr_convert(encoder->swr_ctx, encoder->adatacur,
@@ -678,8 +654,8 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
         encoder->asamplenum -= sampnum;
 
         if (encoder->asamplenum == 0) {
-            aframe->pts = av_rescale_q(encoder->next_apts,
-                (AVRational){1, encoder->astream->codec->sample_rate}, encoder->astream->codec->time_base);
+            AVRational r = { 1, encoder->astream->codec->sample_rate };
+            encoder->aframecur->pts = av_rescale_q(encoder->next_apts, r, encoder->astream->codec->time_base);
             encoder->next_apts += aframe->nb_samples;
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
@@ -698,12 +674,8 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     AVFrame   *vframe  = NULL;
     if (!ctxt) return -1;
 
-    if (sem_trywait(&encoder->vsemw) != 0) {
-        return -1;
-    }
-    else {
-        vframe = &encoder->vframes[encoder->vtail];
-    }
+    sem_wait(&encoder->vsemw);
+    vframe = &encoder->vframes[encoder->vtail];
 
     // scale video image
     sws_scale(
