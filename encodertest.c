@@ -42,7 +42,7 @@ int main(void)
         256000,             // out_video_bitrate
         320,                // out_video_width
         240,                // out_video_height
-        20,                 // out_video_frame_rate
+        30,                 // out_video_frame_rate
 
         // other params
         0,                  // start_apts
