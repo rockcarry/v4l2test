@@ -682,7 +682,7 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
         (const uint8_t * const *)data,
         linesize,
         0,
-        encoder->params.out_video_height,
+        encoder->params.in_video_height,
         vframe->data,
         vframe->linesize);
     vframe->pts = encoder->next_vpts++;
