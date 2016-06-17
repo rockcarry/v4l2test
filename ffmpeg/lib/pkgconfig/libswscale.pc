@@ -5,9 +5,9 @@ includedir=${prefix}/include
 
 Name: libswscale
 Description: FFmpeg image rescaling library
-Version: 4.1.100
+Version: 4.0.100
 Requires: 
-Requires.private: libavutil >= 55.20.100
+Requires.private: libavutil >= 55.17.103
 Conflicts:
 Libs: -L${libdir}  -lswscale 
 Libs.private: -lm
