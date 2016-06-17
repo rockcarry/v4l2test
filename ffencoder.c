@@ -495,8 +495,7 @@ static void close_vstream(FFENCODER *encoder)
 
     //++ for video frames
     for (i=0; i<encoder->params.video_buffer_number; i++) {
-        AVFrame *frame = &encoder->vframes[i];
-        av_frame_free(&frame);
+        av_frame_unref(&encoder->vframes[i]);
     }
     free(encoder->vframes);
     //-- for video frames

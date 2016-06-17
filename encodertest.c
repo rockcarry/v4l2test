@@ -56,9 +56,8 @@ int main(void)
     for (i=0; i<1800; i++)
     {
         rand_buf(abuf, sizeof(abuf));
-        ffencoder_audio(encoder, adata, 44100/30);
-
         rand_buf(vbuf, sizeof(vbuf));
+        ffencoder_audio(encoder, adata, 44100/30);
         ffencoder_video(encoder, vdata, linesize);
     }
 
