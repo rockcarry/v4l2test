@@ -17,11 +17,11 @@ static void rand_buf(void *buf, int size)
 int main(void)
 {
     static uint8_t abuf[44100 / 30 * 2 * 1];
-    static uint8_t vbuf[320 * 240 + 320 * 240 / 2];
+    static uint8_t vbuf[320 * 240 * 2];
     void     *encoder = NULL;
     void     *adata   [8] = { abuf };
-    void     *vdata   [8] = { vbuf, vbuf + 320 * 240, vbuf + 320 * 240 + 320 * 240 / 4 };
-    int       linesize[8] = { 320, 320 / 2, 320 / 2 };
+    void     *vdata   [8] = { vbuf };
+    int       linesize[8] = { 320*2};
     int       i;
 
     printf("encode start\n");
@@ -55,9 +55,9 @@ int main(void)
 
     for (i=0; i<1800; i++)
     {
-        rand_buf(abuf, sizeof(abuf));
+//      rand_buf(abuf, sizeof(abuf));
         rand_buf(vbuf, sizeof(vbuf));
-        ffencoder_audio(encoder, adata, 44100/30);
+//      ffencoder_audio(encoder, adata, 44100/30);
         ffencoder_video(encoder, vdata, linesize);
     }
 
