@@ -50,6 +50,7 @@ typedef struct
     int                thread_state;
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
+    pthread_mutex_t    mutex;
 } FFENCODER;
 
 // 内部全局变量定义
@@ -82,14 +83,19 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 };
 
 // 内部函数实现
-static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
+static int write_frame(FFENCODER *encoder, const AVRational *time_base, AVStream *st, AVPacket *pkt)
 {
+    int ret;
+
     /* rescale output packet timestamp values from codec to stream timebase */
     av_packet_rescale_ts(pkt, *time_base, st->time_base);
     pkt->stream_index = st->index;
 
-    /* Write the compressed frame to the media file. */
-    return av_interleaved_write_frame(fmt_ctx, pkt);
+    pthread_mutex_lock  (&encoder->mutex);
+    ret = av_interleaved_write_frame(encoder->ofctxt, pkt);
+    pthread_mutex_unlock(&encoder->mutex);
+
+    return ret;
 }
 
 static void* audio_encode_thread_proc(void *param)
@@ -117,11 +123,7 @@ static void* audio_encode_thread_proc(void *param)
 
         // write audio
         if (got) {
-            ret = write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
-            if (ret < 0) {
-                printf("error while writing audio frame !\n");
-                exit(1);
-            }
+            write_frame(encoder, &encoder->astream->codec->time_base, encoder->astream, &pkt);
         }
 
         if (++encoder->ahead == encoder->params.audio_buffer_number) {
@@ -133,7 +135,7 @@ static void* audio_encode_thread_proc(void *param)
     do {
         avcodec_encode_audio2(encoder->astream->codec, &pkt, NULL, &got);
         if (got) {
-            write_frame(encoder->ofctxt, &encoder->astream->codec->time_base, encoder->astream, &pkt);
+            write_frame(encoder, &encoder->astream->codec->time_base, encoder->astream, &pkt);
         }
     } while (got);
 
@@ -164,7 +166,7 @@ static void* video_encode_thread_proc(void *param)
             pkt.size   = sizeof(AVPicture);
             pkt.pts    = vframe->pts;
             pkt.dts    = vframe->pts;
-            ret = write_frame(encoder->ofctxt, &(encoder->vstream->codec->time_base), encoder->vstream, &pkt);
+            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
         } else {
             /* encode the image */
             ret = avcodec_encode_video2(encoder->vstream->codec, &pkt, vframe, &got);
@@ -174,7 +176,7 @@ static void* video_encode_thread_proc(void *param)
             }
 
             if (got) {
-                ret = write_frame(encoder->ofctxt, &(encoder->vstream->codec->time_base), encoder->vstream, &pkt);
+                write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
             }
         }
 
@@ -192,7 +194,7 @@ static void* video_encode_thread_proc(void *param)
     do {
         avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
         if (got) {
-            write_frame(encoder->ofctxt, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
         }
     } while (got);
 
@@ -565,6 +567,9 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         goto failed;
     }
 
+    // init mutex for audio/video encoding thread
+    pthread_mutex_init(&encoder->mutex, NULL);
+
     /* now that all the parameters are set, we can open the audio and
      * video codecs and allocate the necessary encode buffers. */
     if (encoder->have_audio) open_audio(encoder);
@@ -606,6 +611,9 @@ void ffencoder_free(void *ctxt)
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
 
+    // destroy mutex
+    pthread_mutex_destroy(&encoder->mutex);
+
     /* write the trailer, if any. The trailer must be written before you
      * close the CodecContexts open when you wrote the header; otherwise
      * av_write_trailer() may try to use memory that was freed on
@@ -643,12 +651,13 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
             aframe = encoder->aframecur;
         }
 
-        sampnum  = swr_convert(encoder->swr_ctx, encoder->adatacur,
-                        encoder->asamplenum, (const uint8_t**)data, nbsample);
+        sampnum  = swr_convert(encoder->swr_ctx,
+                        encoder->adatacur, encoder->asamplenum,
+                        (const uint8_t**)data, nbsample);
         data     = NULL;
         nbsample = 0;
         for (i=0; i<8; i++) {
-            encoder->adatacur[i] += sampnum * encoder->astream->codec->channels * 2;
+            encoder->adatacur[i] += sampnum * 2 * encoder->astream->codec->channels;
         }
         encoder->asamplenum -= sampnum;
 
