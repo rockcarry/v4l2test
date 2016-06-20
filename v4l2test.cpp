@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
     // startpreview
     camdev_set_preview_window(cam, win);
-    camdev_start_preview(cam);
+    camdev_preview_start(cam);
 
     // wait exit
     while (1) {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     }
 
     // stoppreview
-    camdev_stop_preview(cam);
+    camdev_preview_stop(cam);
 
     // close camdev
     camdev_close(cam);

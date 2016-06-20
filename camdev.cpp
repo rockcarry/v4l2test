@@ -401,7 +401,7 @@ void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gb
     camdev_set_preview_window(cam, win);
 }
 
-void camdev_start_preview(CAMDEV *cam)
+void camdev_preview_start(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
@@ -412,7 +412,7 @@ void camdev_start_preview(CAMDEV *cam)
     cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
-void camdev_stop_preview(CAMDEV *cam)
+void camdev_preview_stop(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {

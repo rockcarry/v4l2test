@@ -52,8 +52,8 @@ CAMDEV* camdev_init (const char *dev, int sub, int w, int h);
 void    camdev_close(CAMDEV *cam);
 void    camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win);
 void    camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp);
-void    camdev_start_preview(CAMDEV *cam);
-void    camdev_stop_preview (CAMDEV *cam);
+void    camdev_preview_start(CAMDEV *cam);
+void    camdev_preview_stop (CAMDEV *cam);
 void    camdev_set_encoder  (CAMDEV *cam, void *encoder);
 
 #endif
