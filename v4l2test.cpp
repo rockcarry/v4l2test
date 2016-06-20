@@ -37,12 +37,11 @@ int main(int argc, char *argv[])
     SurfaceComposerClient::openGlobalTransaction();
     surfaceControl->setLayer(0x40000000);
 //  surfaceControl->setPosition(0, 0);
-//  surfaceControl->setSize(dinfo.w, dinfo.h);
+//  surfaceControl->setSize(320, 180);
     SurfaceComposerClient::closeGlobalTransaction();
 
-    sp<Surface> surface = surfaceControl->getSurface();
+    sp<Surface>   surface = surfaceControl->getSurface();
     sp<ANativeWindow> win = surface;
-    native_window_set_buffers_dimensions(win.get(), dinfo.w, dinfo.h);
 
     // init camdev
     cam = camdev_init(dev, sub, w, h, 0);
