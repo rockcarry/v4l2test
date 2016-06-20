@@ -23,6 +23,13 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
+static unsigned long get_tick_count()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
 static void render_v4l2(CAMDEV *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
                         void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts)
@@ -121,6 +128,13 @@ static void* camdev_capture_thread_proc(void *param)
         // dequeue camera video buffer
         if (cam->fd > 0) {
             ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf);
+        }
+
+        if (cam->thread_state & CAMDEV_TS_TEST_FRATE) {
+            if (++cam->tst_count == 10) {
+                cam->tst_time1     =  get_tick_count();
+                cam->thread_state &= ~CAMDEV_TS_TEST_FRATE;
+            }
         }
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
@@ -237,7 +251,7 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
 }
 
 // º¯ÊýÊµÏÖ
-CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
+CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
 {
     CAMDEV *cam = (CAMDEV*)malloc(sizeof(CAMDEV));
     if (!cam) {
@@ -313,10 +327,9 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
         goto done;
     }
 
-#if 0
     struct v4l2_streamparm streamparam;
     streamparam.parm.capture.timeperframe.numerator   = 1;
-    streamparam.parm.capture.timeperframe.denominator = 30;
+    streamparam.parm.capture.timeperframe.denominator = frate;
     streamparam.parm.capture.capturemode              = 0;
     streamparam.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(cam->fd, VIDIOC_S_PARM, &streamparam) != -1) {
@@ -324,11 +337,12 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h)
         ALOGD("current camera frame rate: %d/%d !\n",
             streamparam.parm.capture.timeperframe.denominator,
             streamparam.parm.capture.timeperframe.numerator );
+        cam->cam_frate = (int)( streamparam.parm.capture.timeperframe.denominator
+                              / streamparam.parm.capture.timeperframe.numerator);
     }
     else {
         ALOGW("failed to set camera frame rate !\n");
     }
-#endif
 
     struct v4l2_requestbuffers req;
     req.count  = VIDEO_CAPTURE_BUFFER_COUNT;
@@ -381,6 +395,17 @@ void camdev_close(CAMDEV *cam)
     free(cam);
 }
 
+void camdev_test_frame_rate(CAMDEV *cam)
+{
+    camdev_capture_start(cam);
+    cam->tst_time0     = get_tick_count();
+    cam->tst_count     = 0;
+    cam->thread_state |= CAMDEV_TS_TEST_FRATE;
+    while (cam->thread_state & CAMDEV_TS_TEST_FRATE) usleep(10*1000);
+    cam->tst_frate     = (int)(10000 / (cam->tst_time1 - cam->tst_time0));
+    camdev_capture_stop(cam);
+}
+
 void camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win)
 {
     if (cam) {
@@ -401,25 +426,31 @@ void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gb
     camdev_set_preview_window(cam, win);
 }
 
-void camdev_preview_start(CAMDEV *cam)
+void camdev_capture_start(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
         ioctl(cam->fd, VIDIOC_STREAMON, &type);
     }
-
-    // start thread
-    cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
-void camdev_preview_stop(CAMDEV *cam)
+void camdev_capture_stop(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
         ioctl(cam->fd, VIDIOC_STREAMOFF, &type);
     }
+}
 
-    // pause thread
+void camdev_preview_start(CAMDEV *cam)
+{
+    // set start prevew flag
+    cam->thread_state |= CAMDEV_TS_PREVIEW;
+}
+
+void camdev_preview_stop(CAMDEV *cam)
+{
+    // set stop prevew flag
     cam->thread_state &= ~CAMDEV_TS_PREVIEW;
 }
 

@@ -45,10 +45,17 @@ int main(int argc, char *argv[])
     native_window_set_buffers_dimensions(win.get(), dinfo.w, dinfo.h);
 
     // init camdev
-    cam = camdev_init(dev, sub, w, h);
+    cam = camdev_init(dev, sub, w, h, 0);
+
+    // test frame rate
+    camdev_test_frame_rate(cam);
+
+    printf("camdev cam_frate: %d\n", cam->cam_frate);
+    printf("camdev tst_frate: %d\n", cam->tst_frate);
 
     // startpreview
     camdev_set_preview_window(cam, win);
+    camdev_capture_start(cam);
     camdev_preview_start(cam);
 
     // wait exit
@@ -63,6 +70,7 @@ int main(int argc, char *argv[])
 
     // stoppreview
     camdev_preview_stop(cam);
+    camdev_capture_stop(cam);
 
     // close camdev
     camdev_close(cam);

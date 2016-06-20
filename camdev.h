@@ -43,15 +43,27 @@ typedef struct {
     int                     cam_stride;
     int                     cam_w;
     int                     cam_h;
+    int                     cam_frate;
     SwsContext             *swsctxt;
     void                   *encoder;
+
+    //++ for test frame rate
+    #define CAMDEV_TS_TEST_FRATE (1 << 3)
+    int                     tst_frate;
+    int                     tst_time0;
+    int                     tst_time1;
+    int                     tst_count;
+    //-- for test frame rate
 } CAMDEV;
 
 // º¯Êý¶¨Òå
-CAMDEV* camdev_init (const char *dev, int sub, int w, int h);
+CAMDEV* camdev_init (const char *dev, int sub, int w, int h, int frate);
 void    camdev_close(CAMDEV *cam);
+void    camdev_test_frame_rate   (CAMDEV *cam);
 void    camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win);
 void    camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp);
+void    camdev_capture_start(CAMDEV *cam);
+void    camdev_capture_stop (CAMDEV *cam);
 void    camdev_preview_start(CAMDEV *cam);
 void    camdev_preview_stop (CAMDEV *cam);
 void    camdev_set_encoder  (CAMDEV *cam, void *encoder);
