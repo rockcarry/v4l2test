@@ -384,7 +384,7 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
 
 done:
     // set test frame rate flag
-    cam->thread_state |= CAMDEV_TS_TEST_FRATE;
+    cam->thread_state |= CAMDEV_TS_PAUSE | CAMDEV_TS_TEST_FRATE;
 
     // create capture thread
     pthread_create(&cam->thread_id, NULL, camdev_capture_thread_proc, cam);
@@ -442,6 +442,7 @@ void camdev_capture_start(CAMDEV *cam)
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
         ioctl(cam->fd, VIDIOC_STREAMON, &type);
+        cam->thread_state &= ~CAMDEV_TS_PAUSE;
     }
 }
 
@@ -449,6 +450,7 @@ void camdev_capture_stop(CAMDEV *cam)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (cam->fd > 0) {
+        cam->thread_state |=  CAMDEV_TS_PAUSE;
         ioctl(cam->fd, VIDIOC_STREAMOFF, &type);
     }
 }
