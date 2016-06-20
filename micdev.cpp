@@ -30,12 +30,17 @@ static void* micdev_capture_thread_proc(void *param)
             continue;
         }
 
-        // read data from pcm
+        if (dev->mute) {
+            memset(dev->pcm, 0, dev->buflen);
+        }
+        else {
+            // read data from pcm
 #if 0
-        pcm_read(dev->pcm, dev->buffer, dev->buflen);
+            pcm_read(dev->pcm, dev->buffer, dev->buflen);
 #else
-        pcm_read_ex(dev->pcm, dev->buffer, dev->buflen);
+            pcm_read_ex(dev->pcm, dev->buffer, dev->buflen);
 #endif
+        }
 
         if (dev->encoder) {
             void *data[8] = { dev->buffer };
@@ -50,7 +55,7 @@ static void* micdev_capture_thread_proc(void *param)
 }
 
 // º¯ÊýÊµÏÖ
-void* micdev_init(int samprate, int sampsize, int h)
+void* micdev_init(int samprate)
 {
     MICDEV *dev = (MICDEV*)malloc(sizeof(MICDEV));
     if (!dev) {
@@ -116,6 +121,11 @@ void micdev_stop_capture(MICDEV *dev)
 {
     // stop capture
     dev->thread_state |= MICDEV_TS_PAUSE;
+}
+
+void micdev_set_mute(MICDEV *dev, int mute)
+{
+    dev->mute = mute;
 }
 
 void micdev_set_encoder(MICDEV *dev, void *encoder)
