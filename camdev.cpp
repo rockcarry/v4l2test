@@ -11,7 +11,7 @@
 
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
-#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_RGBX_8888 // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
+#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
 
 #define CAMDEV_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
                            | GRALLOC_USAGE_SW_WRITE_NEVER \
@@ -31,51 +31,64 @@ static unsigned long get_tick_count()
 }
 
 static void render_v4l2(CAMDEV *cam,
-                        void *dstbuf, int dstlen, int dstfmt, int dststride, int dstw, int dsth,
-                        void *srcbuf, int srclen, int srcfmt, int srcstride, int srcw, int srch, int pts)
+                        void *dstbuf, int dstlen, int dstfmt, int dstw, int dsth,
+                        void *srcbuf, int srclen, int srcfmt, int srcw, int srch, int pts)
 {
-    DO_USE_VAR(dstlen   );
-    DO_USE_VAR(dststride);
-    DO_USE_VAR(srcstride);
-    DO_USE_VAR(pts      );
+    DO_USE_VAR(pts);
 
     if (dstfmt != DEF_WIN_PIX_FMT) {
         return;
     }
 
-    if (!srclen) {
-        uint32_t *dst = (uint32_t*)dstbuf;
-        int      size = 0;
-        switch (DEF_WIN_PIX_FMT) {
-        case HAL_PIXEL_FORMAT_RGB_565:      size = dstw * dsth * 2; break;
-        case HAL_PIXEL_FORMAT_RGBX_8888:    size = dstw * dsth * 4; break;
-        case HAL_PIXEL_FORMAT_YV12:         size = dstw * dsth + dstw * dsth / 2; break;
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP: size = dstw * dsth + dstw * dsth / 2; break;
+    // src fmt
+    AVPixelFormat sws_src_fmt = AV_PIX_FMT_NONE;
+    switch (srcfmt) {
+    case V4L2_PIX_FMT_YUYV: sws_src_fmt = AV_PIX_FMT_YUYV422; break;
+    case V4L2_PIX_FMT_NV12: sws_src_fmt = AV_PIX_FMT_NV12;    break;
+    case V4L2_PIX_FMT_NV21: sws_src_fmt = AV_PIX_FMT_NV21;    break;
+    }
+
+    // dst fmt
+    AVPixelFormat sws_dst_fmt = AV_PIX_FMT_NONE;
+    switch (dstfmt) {
+    case HAL_PIXEL_FORMAT_RGB_565:      sws_dst_fmt = AV_PIX_FMT_RGB565;  break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_BGR32;   break;
+    case HAL_PIXEL_FORMAT_YV12:         sws_dst_fmt = AV_PIX_FMT_YUV420P; break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP: sws_dst_fmt = AV_PIX_FMT_NV21;    break;
+    }
+
+    // dst len
+    if (dstlen == -1) {
+        switch (dstfmt) {
+        case HAL_PIXEL_FORMAT_RGB_565:      dstlen = dstw * dsth * 2; break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:    dstlen = dstw * dsth * 4; break;
+        case HAL_PIXEL_FORMAT_YV12:         dstlen = dstw * dsth + dstw * dsth / 2; break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP: dstlen = dstw * dsth + dstw * dsth / 2; break;
+        default:                            dstlen = 0; break;
         }
-        while (size > 0) {
+    }
+
+//  ALOGD("srcfmt = 0x%0x, srcw = %d, srch = %d, srclen = %d, sws_src_fmt = 0x%0x\n", srcfmt, srcw, srch, srclen, sws_src_fmt);
+//  ALOGD("dstfmt = 0x%0x, dstw = %d, dsth = %d, dstlen = %d, sws_dst_fmt = 0x%0x\n", dstfmt, dstw, dsth, dstlen, sws_dst_fmt);
+
+    // rand if no src data
+    if (srclen == 0) {
+        uint32_t *dst = (uint32_t*)dstbuf;
+        int       len = dstlen;
+        while (len > 0) {
             *dst++ = rand();
-            size  -= sizeof(uint32_t);
+            len   -= sizeof(uint32_t);
         }
         return;
     }
 
-//  ALOGD("dstfmt = 0x%0x, dststride = %d, dstw = %d, dsth = %d\n", dstfmt, dststride, dstw, dsth);
-//  ALOGD("srcfmt = 0x%0x, srcstride = %d, srcw = %d, srch = %d\n", srcfmt, srcstride, srcw, srch);
+    // memcpy if same fmt and size
+    if (sws_src_fmt == sws_dst_fmt && srcw == dstw && srch == dsth) {
+        memcpy(dstbuf, srcbuf, dstlen < srclen ? dstlen : srclen);
+        return;
+    }
 
     if (cam->win_w != dstw || cam->win_h != dsth) {
-        AVPixelFormat sws_src_fmt = AV_PIX_FMT_NONE;
-        AVPixelFormat sws_dst_fmt = AV_PIX_FMT_NONE;
-        switch (srcfmt) {
-        case V4L2_PIX_FMT_YUYV: sws_src_fmt = AV_PIX_FMT_YUYV422; break;
-        case V4L2_PIX_FMT_NV12: sws_src_fmt = AV_PIX_FMT_NV12;    break;
-        case V4L2_PIX_FMT_NV21: sws_src_fmt = AV_PIX_FMT_NV21;    break;
-        }
-        switch (DEF_WIN_PIX_FMT) {
-        case HAL_PIXEL_FORMAT_RGB_565:      sws_dst_fmt = AV_PIX_FMT_RGB565;  break;
-        case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_BGR32;   break;
-        case HAL_PIXEL_FORMAT_YV12:         sws_dst_fmt = AV_PIX_FMT_YUV420P; break;
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP: sws_dst_fmt = AV_PIX_FMT_NV21;    break;
-        }
         if (cam->swsctxt) {
             sws_freeContext(cam->swsctxt);
         }
@@ -102,6 +115,8 @@ static void render_v4l2(CAMDEV *cam,
 static void* camdev_capture_thread_proc(void *param)
 {
     CAMDEV *cam = (CAMDEV*)param;
+    int     test_time  = 0;
+    int     test_count = 0;
     int     err;
 
     while (1) {
@@ -110,17 +125,18 @@ static void* camdev_capture_thread_proc(void *param)
         }
 
         if (cam->thread_state & CAMDEV_TS_PAUSE) {
-            usleep(33*1000);
+            usleep(10*1000);
             continue;
         }
 
         if (cam->update_flag) {
             cam->cur_win = cam->new_win;
             if (cam->cur_win != NULL) {
-                native_window_set_usage(cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
-                native_window_set_scaling_mode  (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-                native_window_set_buffer_count  (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
-                native_window_set_buffers_format(cam->cur_win.get(), DEF_WIN_PIX_FMT);
+                native_window_set_usage             (cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
+                native_window_set_scaling_mode      (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
+                native_window_set_buffer_count      (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
+                native_window_set_buffers_format    (cam->cur_win.get(), DEF_WIN_PIX_FMT);
+                native_window_set_buffers_dimensions(cam->cur_win.get(), cam->cam_w, cam->cam_h);
             }
             cam->update_flag = 0;
         }
@@ -129,11 +145,17 @@ static void* camdev_capture_thread_proc(void *param)
         if (cam->fd > 0) {
             ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf);
         }
+        else usleep(10*1000);
 
         if (cam->thread_state & CAMDEV_TS_TEST_FRATE) {
-            if (++cam->tst_count == 10) {
-                cam->tst_time1     =  get_tick_count();
+            if (test_count == 0) {
+                test_time = get_tick_count();
+            }
+            if (test_count++ == 5) {
+                cam->act_frate     = (int)(1000 * 5 / (get_tick_count() - test_time));
                 cam->thread_state &= ~CAMDEV_TS_TEST_FRATE;
+                test_count         = 0;
+                ALOGD("cam->act_frate: %d\n", cam->act_frate);
             }
         }
 
@@ -153,18 +175,14 @@ static void* camdev_capture_thread_proc(void *param)
 
                 if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
                     render_v4l2(cam,
-                        dst , -1 , buf->format    , buf->stride    , buf->width, buf->height,
-                        data, len, cam->cam_pixfmt, cam->cam_stride, cam->cam_w, cam->cam_h, pts);
+                        dst , -1 , buf->format    , buf->width, buf->height,
+                        data, len, cam->cam_pixfmt, cam->cam_w, cam->cam_h, pts);
                     mapper.unlock(buf->handle);
                 }
 
                 if ((err = cam->cur_win->queueBuffer(cam->cur_win.get(), buf, -1)) != 0) {
                     ALOGW("Surface::queueBuffer returned error %d\n", err);
                 }
-            }
-
-            if (!len) {
-                usleep(33 * 1000);
             }
         }
 
@@ -286,13 +304,13 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
         ioctl(cam->fd, VIDIOC_S_INPUT, &input);
     }
 
-    if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV12, &w, &h)) {
-        cam->cam_pixfmt = V4L2_PIX_FMT_NV12;
+    if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_NV21;
         cam->cam_w      = w;
         cam->cam_h      = h;
     }
-    else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
-        cam->cam_pixfmt = V4L2_PIX_FMT_NV21;
+    else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV12, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_NV12;
         cam->cam_w      = w;
         cam->cam_h      = h;
     }
@@ -365,6 +383,10 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
     }
 
 done:
+    // set test frame rate flag
+    cam->thread_state |= CAMDEV_TS_TEST_FRATE;
+
+    // create capture thread
     pthread_create(&cam->thread_id, NULL, camdev_capture_thread_proc, cam);
 
     return cam;
@@ -393,17 +415,6 @@ void camdev_close(CAMDEV *cam)
     // close & free
     close(cam->fd);
     free(cam);
-}
-
-void camdev_test_frame_rate(CAMDEV *cam)
-{
-    camdev_capture_start(cam);
-    cam->tst_time0     = get_tick_count();
-    cam->tst_count     = 0;
-    cam->thread_state |= CAMDEV_TS_TEST_FRATE;
-    while (cam->thread_state & CAMDEV_TS_TEST_FRATE) usleep(10*1000);
-    cam->tst_frate     = (int)(10000 / (cam->tst_time1 - cam->tst_time0));
-    camdev_capture_stop(cam);
 }
 
 void camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win)

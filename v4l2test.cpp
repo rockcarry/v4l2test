@@ -47,12 +47,6 @@ int main(int argc, char *argv[])
     // init camdev
     cam = camdev_init(dev, sub, w, h, 0);
 
-    // test frame rate
-    camdev_test_frame_rate(cam);
-
-    printf("camdev cam_frate: %d\n", cam->cam_frate);
-    printf("camdev tst_frate: %d\n", cam->tst_frate);
-
     // startpreview
     camdev_set_preview_window(cam, win);
     camdev_capture_start(cam);
