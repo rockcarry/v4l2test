@@ -152,7 +152,7 @@ static void* camdev_capture_thread_proc(void *param)
                 test_time = get_tick_count();
             }
             if (test_count++ == 5) {
-                cam->act_frate     = (int)(1000 * 5 / (get_tick_count() - test_time));
+                cam->act_frate     = (int)(1000 * 5 / (get_tick_count() - test_time) + 0.5);
                 cam->thread_state &= ~CAMDEV_TS_TEST_FRATE;
                 test_count         = 0;
                 ALOGD("cam->act_frate: %d\n", cam->act_frate);
@@ -219,15 +219,19 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
     fmtdesc.index = 0;
     fmtdesc.type  = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
+#if 0
     ALOGD("\n");
     ALOGD("VIDIOC_ENUM_FMT   \n");
     ALOGD("------------------\n");
+#endif
 
     while (ioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc) != -1) {
+#if 0
         ALOGD("%d. flags: %d, description: %-16s, pixelfmt: 0x%0x\n",
             fmtdesc.index, fmtdesc.flags,
             fmtdesc.description,
             fmtdesc.pixelformat);
+#endif
         if (fmt == (int)fmtdesc.pixelformat) {
             find = 1;
         }
@@ -246,11 +250,6 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
     v4l2fmt.fmt.pix.height      = *height;
     v4l2fmt.fmt.pix.pixelformat = fmt;
     v4l2fmt.fmt.pix.field       = V4L2_FIELD_NONE;
-
-    ALOGD("\n");
-    ALOGD("VIDIOC_ENUM_FRAMESIZES   \n");
-    ALOGD("-------------------------\n");
-
     ret = ioctl(fd, VIDIOC_TRY_FMT, &v4l2fmt);
     if (ret < 0)
     {
@@ -262,7 +261,6 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
     *width  = v4l2fmt.fmt.pix.width;
     *height = v4l2fmt.fmt.pix.height;
 
-    ALOGD("\n");
     ALOGD("using pixel format: 0x%0x\n", fmt);
     ALOGD("using frame size: %d, %d\n\n", *width, *height);
     return 0;
