@@ -439,20 +439,31 @@ void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gb
 
 void camdev_capture_start(CAMDEV *cam)
 {
+    // check fd valid
+    if (cam->fd <= 0) return;
+
+    // turn on stream
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (cam->fd > 0) {
-        ioctl(cam->fd, VIDIOC_STREAMON, &type);
-        cam->thread_state &= ~CAMDEV_TS_PAUSE;
-    }
+    ioctl(cam->fd, VIDIOC_STREAMON, &type);
+
+    // resume thread
+    cam->thread_state &= ~CAMDEV_TS_PAUSE;
 }
 
 void camdev_capture_stop(CAMDEV *cam)
 {
+    // check fd valid
+    if (cam->fd <= 0) return;
+
+    // pause thread
+    cam->thread_state |= CAMDEV_TS_PAUSE;
+
+    // dequeue buffer
+    ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf);
+
+    // turn off stream
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (cam->fd > 0) {
-        cam->thread_state |=  CAMDEV_TS_PAUSE;
-        ioctl(cam->fd, VIDIOC_STREAMOFF, &type);
-    }
+    ioctl(cam->fd, VIDIOC_STREAMOFF, &type);
 }
 
 void camdev_preview_start(CAMDEV *cam)
