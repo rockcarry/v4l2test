@@ -11,6 +11,41 @@
 #include <libswresample/swresample.h>
 #include "ffencoder.h"
 
+//++ frame dropper
+typedef struct {
+    int x;
+    int y;
+    int dx;
+    int dy;
+    int e;
+} FRAMEDROPPER;
+
+void frame_dropper_init   (FRAMEDROPPER *pfd, int frate_in, int frate_out);
+int  frame_dropper_clocked(FRAMEDROPPER *pfd);
+
+void frame_dropper_init(FRAMEDROPPER *pfd, int frate_in, int frate_out)
+{
+    pfd->x  = 0;
+    pfd->y  = 0;
+    pfd->e  = 0;
+    pfd->dx = frate_in;
+    pfd->dy = frate_out;
+}
+
+int frame_dropper_clocked(FRAMEDROPPER *pfd)
+{
+    pfd->x++;
+    pfd->e += pfd->dy;
+    if (pfd->e * 2 >= pfd->dx) {
+        pfd->y++;
+        pfd->e -= pfd->dx;
+//      printf("%d, %d\n", pfd->x, pfd->y);
+        return 1;
+    }
+    return 0;
+}
+//-- frame dropper
+
 // 内部类型定义
 typedef struct
 {
@@ -37,6 +72,7 @@ typedef struct
     sem_t              vsemw;
     int                vhead;
     int                vtail;
+    FRAMEDROPPER       vdropper;
 
     AVFormatContext   *ofctxt;
     AVCodec           *acodec;
@@ -63,6 +99,7 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     640,                // in_video_width
     480,                // in_video_height
     AV_PIX_FMT_YUYV422, // in_video_pixfmt
+    30,                 // in_video_frame_rate
 
     // output params
     "/sdcard/test.mp4", // filename
@@ -525,6 +562,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->in_video_width          ) params->in_video_width          = DEF_FFENCODER_PARAMS.in_video_width;
     if (!params->in_video_height         ) params->in_video_height         = DEF_FFENCODER_PARAMS.in_video_height;
     if (!params->in_video_pixfmt         ) params->in_video_pixfmt         = DEF_FFENCODER_PARAMS.in_video_pixfmt;
+    if (!params->in_video_frame_rate     ) params->in_video_frame_rate     = DEF_FFENCODER_PARAMS.in_video_frame_rate;
     if (!params->out_filename            ) params->out_filename            = DEF_FFENCODER_PARAMS.out_filename;
     if (!params->out_audio_bitrate       ) params->out_audio_bitrate       = DEF_FFENCODER_PARAMS.out_audio_bitrate;
     if (!params->out_audio_channel_layout) params->out_audio_channel_layout= DEF_FFENCODER_PARAMS.out_audio_channel_layout;
@@ -590,6 +628,9 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         printf("error occurred when opening output file !\n");
         goto failed;
     }
+
+    // init frame dropper
+    frame_dropper_init(&encoder->vdropper, params->in_video_frame_rate, params->out_video_frame_rate);
 
     // successed
     return encoder;
@@ -681,6 +722,11 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *vframe  = NULL;
     if (!ctxt) return -1;
+
+    if (!frame_dropper_clocked(&encoder->vdropper)) {
+//      printf("frame dropped by frame dropper !\n");
+        return 0;
+    }
 
     sem_wait(&encoder->vsemw);
     vframe = &encoder->vframes[encoder->vtail];

@@ -20,7 +20,7 @@ using namespace android;
 #define NATIVE_WIN_BUFFER_COUNT     3
 
 // 类型定义
-struct video_buffer{
+struct video_buffer {
     void    *addr;
     unsigned len;
 };

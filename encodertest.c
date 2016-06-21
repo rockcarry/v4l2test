@@ -33,6 +33,7 @@ int main(void)
         320,                // in_video_width
         240,                // in_video_height
         AV_PIX_FMT_YUYV422, // in_video_pixfmt
+        30,                 // in_video_frame_rate
 
         // output params
         "/sdcard/test.mp4", // filename
@@ -42,7 +43,7 @@ int main(void)
         256000,             // out_video_bitrate
         320,                // out_video_width
         240,                // out_video_height
-        30,                 // out_video_frame_rate
+        25,                 // out_video_frame_rate
 
         // other params
         0,                  // start_apts

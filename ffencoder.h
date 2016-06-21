@@ -15,6 +15,7 @@ typedef struct
     int   in_video_width;
     int   in_video_height;
     int   in_video_pixfmt;
+    int   in_video_frame_rate;
 
     // output params
     char *out_filename;
