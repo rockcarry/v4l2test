@@ -23,7 +23,7 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
-static unsigned long get_tick_count()
+static uint64_t get_tick_count()
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -114,10 +114,10 @@ static void render_v4l2(CAMDEV *cam,
 
 static void* camdev_capture_thread_proc(void *param)
 {
-    CAMDEV *cam = (CAMDEV*)param;
-    int     test_time  = 0;
-    int     test_count = 0;
-    int     err;
+    CAMDEV  *cam = (CAMDEV*)param;
+    uint64_t test_time  = 0;
+    int      test_count = 0;
+    int      err;
 
     while (1) {
         if (cam->thread_state & CAMDEV_TS_EXIT) {
