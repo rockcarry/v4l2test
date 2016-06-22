@@ -61,6 +61,9 @@ void    camdev_preview_start(CAMDEV *cam);
 void    camdev_preview_stop (CAMDEV *cam);
 void    camdev_set_encoder  (CAMDEV *cam, void *encoder);
 
+int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt);
+int android_pixfmt_to_ffmpeg_pixfmt(int srcfmt);
+
 #endif
 
 

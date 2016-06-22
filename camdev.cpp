@@ -41,21 +41,10 @@ static void render_v4l2(CAMDEV *cam,
     }
 
     // src fmt
-    AVPixelFormat sws_src_fmt = AV_PIX_FMT_NONE;
-    switch (srcfmt) {
-    case V4L2_PIX_FMT_YUYV: sws_src_fmt = AV_PIX_FMT_YUYV422; break;
-    case V4L2_PIX_FMT_NV12: sws_src_fmt = AV_PIX_FMT_NV12;    break;
-    case V4L2_PIX_FMT_NV21: sws_src_fmt = AV_PIX_FMT_NV21;    break;
-    }
+    AVPixelFormat sws_src_fmt = (AVPixelFormat)v4l2dev_pixfmt_to_ffmpeg_pixfmt(srcfmt);
 
     // dst fmt
-    AVPixelFormat sws_dst_fmt = AV_PIX_FMT_NONE;
-    switch (dstfmt) {
-    case HAL_PIXEL_FORMAT_RGB_565:      sws_dst_fmt = AV_PIX_FMT_RGB565;  break;
-    case HAL_PIXEL_FORMAT_RGBX_8888:    sws_dst_fmt = AV_PIX_FMT_BGR32;   break;
-    case HAL_PIXEL_FORMAT_YV12:         sws_dst_fmt = AV_PIX_FMT_YUV420P; break;
-    case HAL_PIXEL_FORMAT_YCrCb_420_SP: sws_dst_fmt = AV_PIX_FMT_NV21;    break;
-    }
+    AVPixelFormat sws_dst_fmt = (AVPixelFormat)android_pixfmt_to_ffmpeg_pixfmt(dstfmt);
 
     // dst len
     if (dstlen == -1) {
@@ -479,5 +468,30 @@ void camdev_preview_stop(CAMDEV *cam)
 void camdev_set_encoder(CAMDEV *cam, void *encoder)
 {
     cam->encoder = encoder;
+}
+
+int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt)
+{
+    // src fmt
+    int dst_fmt = AV_PIX_FMT_NONE;
+    switch (srcfmt) {
+    case V4L2_PIX_FMT_YUYV: dst_fmt = AV_PIX_FMT_YUYV422; break;
+    case V4L2_PIX_FMT_NV12: dst_fmt = AV_PIX_FMT_NV12;    break;
+    case V4L2_PIX_FMT_NV21: dst_fmt = AV_PIX_FMT_NV21;    break;
+    }
+    return dst_fmt;
+}
+
+int android_pixfmt_to_ffmpeg_pixfmt(int srcfmt)
+{
+    // dst fmt
+    int dst_fmt = AV_PIX_FMT_NONE;
+    switch (srcfmt) {
+    case HAL_PIXEL_FORMAT_RGB_565:      dst_fmt = AV_PIX_FMT_RGB565;  break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:    dst_fmt = AV_PIX_FMT_BGR32;   break;
+    case HAL_PIXEL_FORMAT_YV12:         dst_fmt = AV_PIX_FMT_YUV420P; break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP: dst_fmt = AV_PIX_FMT_NV21;    break;
+    }
+    return dst_fmt;
 }
 
