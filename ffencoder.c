@@ -704,8 +704,8 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
 
         if (encoder->asamplenum == 0) {
             AVRational r = { 1, encoder->astream->codec->sample_rate };
-            encoder->aframecur->pts = av_rescale_q(encoder->next_apts, r, encoder->astream->codec->time_base);
-            encoder->next_apts += aframe->nb_samples;
+            encoder->aframecur->pts = encoder->next_apts;
+            encoder->next_apts     += aframe->nb_samples;
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
                 encoder->atail = 0;
@@ -721,9 +721,16 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *vframe  = NULL;
+    int        drop    = 0;
     if (!ctxt) return -1;
 
-    if (!frame_dropper_clocked(&encoder->vdropper)) {
+    int64_t apts = av_rescale_q(encoder->next_apts, encoder->astream->codec->time_base, (AVRational){1,1000});
+    int64_t vpts = av_rescale_q(encoder->next_vpts, encoder->vstream->codec->time_base, (AVRational){1,1000});
+
+    drop = !frame_dropper_clocked(&encoder->vdropper);
+    if (vpts - apts > 100) drop = 1;
+    if (apts - vpts > 100) drop = 0;
+    if (drop) {
 //      printf("frame dropped by frame dropper !\n");
         return 0;
     }
