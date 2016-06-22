@@ -273,7 +273,8 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
     cam->fd = open(dev, O_RDWR | O_NONBLOCK);
     if (cam->fd < 0) {
         ALOGW("failed to open video device: %s\n", dev);
-        goto done;
+        free(cam);
+        return NULL;
     }
 
     struct v4l2_capability cap;
@@ -331,8 +332,8 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
     else {
         ALOGW("failed to camera preview size and pixel format !\n");
         close(cam->fd);
-        cam->fd = 0;
-        goto done;
+        free (cam);
+        return NULL;
     }
 
     struct v4l2_streamparm streamparam;
@@ -372,7 +373,6 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
         ioctl(cam->fd, VIDIOC_QBUF, &cam->buf);
     }
 
-done:
     // set test frame rate flag
     cam->thread_state |= CAMDEV_TS_PAUSE | CAMDEV_TS_TEST_FRATE;
 

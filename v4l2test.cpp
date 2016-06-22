@@ -45,6 +45,10 @@ int main(int argc, char *argv[])
 
     // init camdev
     cam = camdev_init(dev, sub, w, h, 0);
+    if (!cam) {
+        printf("failed to create camdev !\n");
+        exit(1);
+    }
 
     // startpreview
     camdev_set_preview_window(cam, win);
