@@ -60,17 +60,6 @@ static void render_v4l2(CAMDEV *cam,
 //  ALOGD("srcfmt = 0x%0x, srcw = %d, srch = %d, srclen = %d, sws_src_fmt = 0x%0x\n", srcfmt, srcw, srch, srclen, sws_src_fmt);
 //  ALOGD("dstfmt = 0x%0x, dstw = %d, dsth = %d, dstlen = %d, sws_dst_fmt = 0x%0x\n", dstfmt, dstw, dsth, dstlen, sws_dst_fmt);
 
-    // rand if no src data
-    if (srclen == 0) {
-        uint32_t *dst = (uint32_t*)dstbuf;
-        int       len = dstlen;
-        while (len > 0) {
-            *dst++ = rand();
-            len   -= sizeof(uint32_t);
-        }
-        return;
-    }
-
     // memcpy if same fmt and size
     if (sws_src_fmt == sws_dst_fmt && srcw == dstw && srch == dsth) {
         memcpy(dstbuf, srcbuf, dstlen < srclen ? dstlen : srclen);
@@ -108,6 +97,11 @@ static void* camdev_capture_thread_proc(void *param)
     int      test_count = 0;
     int      err;
 
+    //++ for select
+    fd_set        fds;
+    struct timeval tv;
+    //-- for select
+
     while (1) {
         if (cam->thread_state & CAMDEV_TS_EXIT) {
             break;
@@ -130,11 +124,20 @@ static void* camdev_capture_thread_proc(void *param)
             cam->update_flag = 0;
         }
 
-        // dequeue camera video buffer
-        if (cam->fd > 0) {
-            ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf);
+        FD_ZERO(&fds);
+        FD_SET (cam->fd, &fds);
+        tv.tv_sec  = 1;
+        tv.tv_usec = 0;
+        if (select(cam->fd + 1, &fds, NULL, NULL, &tv) <= 0) {
+            ALOGD("select error or timeout !\n");
+            continue;
         }
-        else usleep(10*1000);
+
+        // dequeue camera video buffer
+        if (-1 == ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf)) {
+            ALOGD("failed to de-queue buffer !\n");
+            continue;
+        }
 
         if (cam->thread_state & CAMDEV_TS_TEST_FRATE) {
             if (test_count == 0) {
@@ -190,8 +193,8 @@ static void* camdev_capture_thread_proc(void *param)
         }
 
         // requeue camera video buffer
-        if (cam->fd > 0) {
-            ioctl(cam->fd, VIDIOC_QBUF , &cam->buf);
+        if (-1 == ioctl(cam->fd, VIDIOC_QBUF , &cam->buf)) {
+            ALOGD("failed to en-queue buffer !\n");
         }
     }
 
@@ -267,7 +270,7 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
     memset(cam, 0, sizeof(CAMDEV));
 
     // open camera device
-    cam->fd = open(dev, O_RDWR);
+    cam->fd = open(dev, O_RDWR | O_NONBLOCK);
     if (cam->fd < 0) {
         ALOGW("failed to open video device: %s\n", dev);
         goto done;
@@ -444,9 +447,6 @@ void camdev_capture_stop(CAMDEV *cam)
 
     // pause thread
     cam->thread_state |= CAMDEV_TS_PAUSE;
-
-    // dequeue buffer
-    ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf);
 
     // turn off stream
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
