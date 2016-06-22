@@ -3,13 +3,16 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "ffencoder.h"
+
+extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/avutil.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
-#include "ffencoder.h"
+}
 
 //++ frame dropper
 typedef struct {
@@ -93,30 +96,30 @@ typedef struct
 static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 {
     // input params
-    AV_CH_LAYOUT_STEREO,// in_audio_channel_layout
-    AV_SAMPLE_FMT_S16,  // in_audio_sample_fmt
-    44100,              // in_audio_sample_rate
-    640,                // in_video_width
-    480,                // in_video_height
-    AV_PIX_FMT_YUYV422, // in_video_pixfmt
-    30,                 // in_video_frame_rate
+    AV_CH_LAYOUT_STEREO,        // in_audio_channel_layout
+    AV_SAMPLE_FMT_S16,          // in_audio_sample_fmt
+    44100,                      // in_audio_sample_rate
+    640,                        // in_video_width
+    480,                        // in_video_height
+    AV_PIX_FMT_YUYV422,         // in_video_pixfmt
+    30,                         // in_video_frame_rate
 
     // output params
-    "/sdcard/test.mp4", // filename
-    32000,              // out_audio_bitrate
-    AV_CH_LAYOUT_MONO,  // out_audio_channel_layout
-    44100,              // out_audio_sample_rate
-    256000,             // out_video_bitrate
-    320,                // out_video_width
-    240,                // out_video_height
-    20,                 // out_video_frame_rate
+    (char*)"/sdcard/test.mp4",  // filename
+    32000,                      // out_audio_bitrate
+    AV_CH_LAYOUT_MONO,          // out_audio_channel_layout
+    44100,                      // out_audio_sample_rate
+    256000,                     // out_video_bitrate
+    320,                        // out_video_width
+    240,                        // out_video_height
+    20,                         // out_video_frame_rate
 
     // other params
-    0,                  // start_apts
-    0,                  // start_vpts
-    SWS_FAST_BILINEAR,  // scale_flags
-    5,                  // audio_buffer_number
-    5,                  // video_buffer_number
+    0,                          // start_apts
+    0,                          // start_vpts
+    SWS_FAST_BILINEAR,          // scale_flags
+    5,                          // audio_buffer_number
+    5,                          // video_buffer_number
 };
 
 // 内部函数实现
@@ -139,9 +142,11 @@ static void* audio_encode_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
     AVFrame   *aframe  = NULL;
-    AVPacket   pkt     = {0};
+    AVPacket   pkt;
     int        got     =  0;
     int        ret     =  0;
+
+    memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
         sem_wait(&encoder->asemr);
@@ -183,9 +188,11 @@ static void* video_encode_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
     AVFrame   *vframe  = NULL;
-    AVPacket   pkt     = {0};
+    AVPacket   pkt;
     int        got     =  0;
     int        ret     =  0;
+
+    memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
         sem_wait(&encoder->vsemr);
@@ -374,7 +381,7 @@ static void open_audio(FFENCODER *encoder)
     AVCodecContext *c         = encoder->astream->codec;
     AVDictionary   *opt       = NULL;
     int             in_layout = encoder->params.in_audio_channel_layout;
-    int             in_sfmt   = encoder->params.in_audio_sample_fmt;
+    AVSampleFormat  in_sfmt   = (AVSampleFormat)encoder->params.in_audio_sample_fmt;
     int             in_rate   = encoder->params.in_audio_sample_rate;
     int             in_chnb   = av_get_channel_layout_nb_channels(in_layout);
     int             i, ret;
@@ -469,10 +476,10 @@ static void open_video(FFENCODER *encoder)
     encoder->sws_ctx = sws_getContext(
         encoder->params.in_video_width,
         encoder->params.in_video_height,
-        encoder->params.in_video_pixfmt,
+        (AVPixelFormat)encoder->params.in_video_pixfmt,
         c->width,
         c->height,
-        c->pix_fmt,
+        (AVPixelFormat)c->pix_fmt,
         encoder->params.scale_flags,
         NULL, NULL, NULL);
     if (!encoder->sws_ctx) {
@@ -644,9 +651,6 @@ void ffencoder_free(void *ctxt)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     if (!ctxt) return;
-
-    AVPacket pkt = {0};
-    int      got =  0;
 
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);

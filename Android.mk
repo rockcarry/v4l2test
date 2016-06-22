@@ -8,18 +8,14 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
-LOCAL_C_INCLUDES := external/tinyalsa/include
-
 LOCAL_SRC_FILES := \
     v4l2test.cpp \
     camdev.cpp \
-    micdev.cpp \
-    ffencoder.c
+    ffencoder.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \
     libcutils \
-    libz \
     libui \
     libgui \
     libandroid_runtime
@@ -55,13 +51,12 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
 LOCAL_SRC_FILES := \
-    ffencoder.c \
-    encodertest.c
+    ffencoder.cpp \
+    encodertest.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \
-    libcutils \
-    libz
+    libcutils
 
 #++ for ffmpeg library
 LOCAL_CFLAGS += \

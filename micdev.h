@@ -2,7 +2,12 @@
 #define __MICDEV_H__
 
 // 包含头文件
+#include <pthread.h>
 #include <tinyalsa/asoundlib.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     struct pcm_config config;
@@ -25,8 +30,11 @@ void  micdev_stop_capture (MICDEV *dev);
 void  micdev_set_mute     (MICDEV *dev, int mute);
 void  micdev_set_encoder  (MICDEV *dev, void *encoder);
 
+#ifdef __cplusplus
+}
 #endif
 
+#endif
 
 
 
