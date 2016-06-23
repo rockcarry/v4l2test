@@ -10,8 +10,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
 LOCAL_SRC_FILES := \
     v4l2test.cpp \
-    camdev.cpp \
-    ffencoder.cpp
+    camdev.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \
@@ -77,5 +76,4 @@ LOCAL_LDFLAGS += -ldl \
 LOCAL_MULTILIB := 32
 
 include $(BUILD_EXECUTABLE)
-
 

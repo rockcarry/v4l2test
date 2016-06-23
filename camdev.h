@@ -25,6 +25,10 @@ struct video_buffer {
     unsigned len;
 };
 
+// camdev capture callback
+typedef int (*CAMDEV_CAPTURE_CALLBACK)(void *recorder, void *data[8], int linesize[8]);
+
+// camdev context
 typedef struct {
     struct v4l2_buffer      buf;
     struct video_buffer     vbs[VIDEO_CAPTURE_BUFFER_COUNT];
@@ -47,7 +51,8 @@ typedef struct {
     int                     cam_frate; // camdev frame rate get from v4l2 interface
     int                     act_frate; // camdev frame rate actual get by test frame
     SwsContext             *swsctxt;
-    void                   *encoder;
+    CAMDEV_CAPTURE_CALLBACK callback;
+    void                   *recorder;
 } CAMDEV;
 
 // º¯Êý¶¨Òå
@@ -59,7 +64,7 @@ void    camdev_capture_start(CAMDEV *cam);
 void    camdev_capture_stop (CAMDEV *cam);
 void    camdev_preview_start(CAMDEV *cam);
 void    camdev_preview_stop (CAMDEV *cam);
-void    camdev_set_encoder  (CAMDEV *cam, void *encoder);
+void    camdev_set_callback (CAMDEV *cam, CAMDEV_CAPTURE_CALLBACK callback, void *recorder);
 
 int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt);
 int android_pixfmt_to_ffmpeg_pixfmt(int srcfmt);

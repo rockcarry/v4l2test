@@ -178,7 +178,7 @@ static void* camdev_capture_thread_proc(void *param)
             }
         }
 
-        if (cam->encoder) {
+        if (cam->callback) {
             int      camw        = cam->cam_w;
             int      camh        = cam->cam_h;
             uint8_t *cbuf        = (uint8_t*)cam->vbs[cam->buf.index].addr;
@@ -187,9 +187,7 @@ static void* camdev_capture_thread_proc(void *param)
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
             }
-            if (0 != ffencoder_video(cam->encoder, data, linesize)) {
-                ALOGD("encoder drop video frame !\n");
-            }
+            cam->callback(cam->recorder, data, linesize);
         }
 
         // requeue camera video buffer
@@ -465,9 +463,10 @@ void camdev_preview_stop(CAMDEV *cam)
     cam->thread_state &= ~CAMDEV_TS_PREVIEW;
 }
 
-void camdev_set_encoder(CAMDEV *cam, void *encoder)
+void camdev_set_callback(CAMDEV *cam, CAMDEV_CAPTURE_CALLBACK callback, void *recorder)
 {
-    cam->encoder = encoder;
+    cam->callback = callback;
+    cam->recorder = recorder;
 }
 
 int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt)

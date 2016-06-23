@@ -9,6 +9,10 @@
 extern "C" {
 #endif
 
+// micdev capture callback
+typedef int (*MICDEV_CAPTURE_CALLBACK)(void *recorder, void *data[8], int nbsample);
+
+// micdev context
 typedef struct {
     struct pcm_config config;
     struct pcm       *pcm;
@@ -19,7 +23,8 @@ typedef struct {
     #define MICDEV_TS_PAUSE (1 << 1)
     pthread_t         thread_id;
     int               thread_state;
-    void             *encoder;
+    MICDEV_CAPTURE_CALLBACK callback;
+    void                   *recorder;
 } MICDEV;
 
 // º¯Êý¶¨Òå
@@ -28,7 +33,7 @@ void  micdev_close(MICDEV *dev );
 void  micdev_start_capture(MICDEV *dev);
 void  micdev_stop_capture (MICDEV *dev);
 void  micdev_set_mute     (MICDEV *dev, int mute);
-void  micdev_set_encoder  (MICDEV *dev, void *encoder);
+void  micdev_set_callback (MICDEV *dev, MICDEV_CAPTURE_CALLBACK callback, void *recorder);
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,6 @@
 // 包含头文件
 #include <stdlib.h>
 #include <utils/Log.h>
-#include "ffencoder.h"
 #include "micdev.h"
 
 // 内部常量定义
@@ -42,12 +41,10 @@ static void* micdev_capture_thread_proc(void *param)
 #endif
         }
 
-        if (dev->encoder) {
+        if (dev->callback) {
             void *data[8] = { dev->buffer };
             int   sampnum = dev->buflen / (2 * DEF_PCM_CHANNEL);
-            if (0 != ffencoder_audio(dev->encoder, data, sampnum)) {
-                ALOGD("encoder drop audio frame !\n");
-            }
+            dev->callback(dev->recorder, data, sampnum);
         }
     }
 
@@ -128,8 +125,9 @@ void micdev_set_mute(MICDEV *dev, int mute)
     dev->mute = mute;
 }
 
-void micdev_set_encoder(MICDEV *dev, void *encoder)
+void micdev_set_callback(MICDEV *dev, MICDEV_CAPTURE_CALLBACK callback, void *recorder)
 {
-    dev->encoder = encoder;
+    dev->callback = callback;
+    dev->recorder = recorder;
 }
 
