@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     ffrecorder_preview_start (recorder);
 
     // start record
-    ffrecorder_record_start(recorder, (char*)"/sdcard/test0.mp4");
+    ffrecorder_record_start(recorder, (char*)"/sdcard/test000.mp4");
 
     // wait exit
     while (1) {
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
         }
 
         if (++i % 600 == 0) {
-            sprintf(file, "/sdcard/test%d.mp4", i / 600);
+            sprintf(file, "/sdcard/test%03d.mp4", i / 600);
             ffrecorder_record_start(recorder, file);
         }
         usleep(100*1000);

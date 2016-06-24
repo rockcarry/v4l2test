@@ -43,10 +43,10 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     256000,                     // out_video_bitrate;
     320,                        // out_video_width;
     200,                        // out_video_height;
-    20,                         // out_video_frate;
+    15,                         // out_video_frate;
 
     // other params
-    SWS_FAST_BILINEAR,          // scale_flags;
+    SWS_POINT,                  // scale_flags;
     5,                          // audio_buffer_number;
     5,                          // video_buffer_number;
 };
