@@ -23,7 +23,7 @@ The android standard api:
 android.hardware.Camera
 android.media.MediaRecorder
 
-is very unstable. My apks often meet fatal error, and crash many times. And it is very diffcult to position the problem code, and fix bugs. How is the android standard api for camera and recorder ? I say, it just a toy. This is why I create the v4l2test project.
+is very unstable. My apks often meet fatal error, and crash many times. And it is very diffcult to position the problem code, and fix bugs. How is the android standard api for camera and recorder? I say, it just a toy. This is why I create the v4l2test project.
 
 Compared with android camera hal & camera api, my project directly access to camera and mic devices, it is KISS, with out any complex architecture, with out any hal, with out any service, the code is very simple and easy to debug. above the project C/C++ code, you can write a simple jni for java, then you can write a apk, to implement the camera preview and video recording. The code is simple to read and debug, is great.
 
@@ -58,15 +58,14 @@ support at least two camera, preview and recording at the same time
 3.  live streaming
 support live streaming video to http or rtmp
 
-4.  stability and performance
+4.  support capture audio from android.media.AudioRecord
 
+5.  stability and performance
 
 
 
 rockcarry
 2016-6-22
-
-
 
 
 
