@@ -61,8 +61,7 @@ typedef struct
     AVFrame           *aframes;
     int64_t            next_apts;
     AVFrame           *aframecur;
-    uint8_t           *adatacur[8];
-    int                asamplenum;
+    int                asampavail;
     sem_t              asemr;
     sem_t              asemw;
     int                ahead;
@@ -672,34 +671,32 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *aframe  = NULL;
+    uint8_t   *adatacur[8];
     int        sampnum, i;
     if (!ctxt) return -1;
 
     do {
         // resample audio
-        if (encoder->asamplenum == 0) {
+        if (encoder->asampavail == 0) {
             sem_wait(&encoder->asemw);
-            aframe = encoder->aframecur = &encoder->aframes[encoder->atail];
-            for (i=0; i<8; i++) {
-                encoder->adatacur[i] = aframe->data[i];
-            }
-            encoder->asamplenum = aframe->nb_samples;
+            encoder->aframecur  = &encoder->aframes[encoder->atail];
+            encoder->asampavail =  encoder->aframes[encoder->atail].nb_samples;
         }
-        else {
-            aframe = encoder->aframecur;
+
+        aframe = encoder->aframecur;
+        for (i=0; i<8; i++) {
+            adatacur[i] = aframe->data[i] + ( (aframe->nb_samples - encoder->asampavail)
+                                            * (16 / 8) * encoder->astream->codec->channels );
         }
 
         sampnum  = swr_convert(encoder->swr_ctx,
-                        encoder->adatacur, encoder->asamplenum,
+                        adatacur, encoder->asampavail,
                         (const uint8_t**)data, nbsample);
         data     = NULL;
         nbsample = 0;
-        for (i=0; i<8; i++) {
-            encoder->adatacur[i] += sampnum * 2 * encoder->astream->codec->channels;
-        }
-        encoder->asamplenum -= sampnum;
+        encoder->asampavail -= sampnum;
 
-        if (encoder->asamplenum == 0) {
+        if (encoder->asampavail == 0) {
             encoder->aframecur->pts = encoder->next_apts;
             encoder->next_apts     += aframe->nb_samples;
 
