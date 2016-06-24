@@ -383,7 +383,6 @@ static void open_audio(FFENCODER *encoder)
     int             in_layout = encoder->params.in_audio_channel_layout;
     AVSampleFormat  in_sfmt   = (AVSampleFormat)encoder->params.in_audio_sample_fmt;
     int             in_rate   = encoder->params.in_audio_sample_rate;
-    int             in_chnb   = av_get_channel_layout_nb_channels(in_layout);
     int             i, ret;
 
     /* open it */
@@ -396,19 +395,13 @@ static void open_audio(FFENCODER *encoder)
     }
 
     /* create resampler context */
-    encoder->swr_ctx = swr_alloc();
+    encoder->swr_ctx = swr_alloc_set_opts(NULL,
+        c->channel_layout, c->sample_fmt, c->sample_rate,
+        in_layout, in_sfmt, in_rate, 0, NULL);
     if (!encoder->swr_ctx) {
         printf("could not allocate resampler context\n");
         exit(1);
     }
-
-    /* set options */
-    av_opt_set_int       (encoder->swr_ctx, "in_channel_count",  in_chnb,        0);
-    av_opt_set_int       (encoder->swr_ctx, "in_sample_rate",    in_rate,        0);
-    av_opt_set_sample_fmt(encoder->swr_ctx, "in_sample_fmt",     in_sfmt,        0);
-    av_opt_set_int       (encoder->swr_ctx, "out_channel_count", c->channels,    0);
-    av_opt_set_int       (encoder->swr_ctx, "out_sample_rate",   c->sample_rate, 0);
-    av_opt_set_sample_fmt(encoder->swr_ctx, "out_sample_fmt",    c->sample_fmt,  0);
 
     /* initialize the resampling context */
     if ((ret = swr_init(encoder->swr_ctx)) < 0) {
@@ -707,7 +700,6 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
         encoder->asamplenum -= sampnum;
 
         if (encoder->asamplenum == 0) {
-            AVRational r = { 1, encoder->astream->codec->sample_rate };
             encoder->aframecur->pts = encoder->next_apts;
             encoder->next_apts     += aframe->nb_samples;
 

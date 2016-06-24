@@ -14,6 +14,7 @@ typedef struct
 {
     // micdev input params
     int   mic_sample_rate;
+    int   mic_channel_num;
 
     // camdev input params
     char *cam_dev_name;

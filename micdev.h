@@ -28,7 +28,7 @@ typedef struct {
 } MICDEV;
 
 // º¯Êý¶¨Òå
-void* micdev_init (int samprate);
+void* micdev_init (int samprate, int channels);
 void  micdev_close(MICDEV *dev );
 void  micdev_start_capture(MICDEV *dev);
 void  micdev_stop_capture (MICDEV *dev);

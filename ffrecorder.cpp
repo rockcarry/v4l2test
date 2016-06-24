@@ -27,7 +27,8 @@ typedef struct
 static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 {
     // micdev input params
-    44100,                      // mic_sample_rate
+    32000,                      // mic_sample_rate
+    2,                          // mic_channel_num
 
     // camdev input params
     (char*)"/dev/video0",       // cam_dev_name
@@ -37,18 +38,18 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     25,                         // cam_frame_rate
 
     // ffencoder output
-    64000,                      // out_audio_bitrate;
+    16000,                      // out_audio_bitrate;
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout;
-    44100,                      // out_audio_samprate;
-    256000,                     // out_video_bitrate;
+    16000,                      // out_audio_samprate;
+    512000,                     // out_video_bitrate;
     320,                        // out_video_width;
     200,                        // out_video_height;
     15,                         // out_video_frate;
 
     // other params
     SWS_POINT,                  // scale_flags;
-    5,                          // audio_buffer_number;
-    5,                          // video_buffer_number;
+    6,                          // audio_buffer_number;
+    6,                          // video_buffer_number;
 };
 
 // 内部函数实现
@@ -102,6 +103,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params)
     // using default params if not set
     if (!params                      ) params                       = &DEF_FFRECORDER_PARAMS;
     if (!params->mic_sample_rate     ) params->mic_sample_rate      = DEF_FFRECORDER_PARAMS.mic_sample_rate;
+    if (!params->mic_sample_rate     ) params->mic_channel_num      = DEF_FFRECORDER_PARAMS.mic_channel_num;
     if (!params->cam_dev_name        ) params->cam_dev_name         = DEF_FFRECORDER_PARAMS.cam_dev_name;
     if (!params->cam_sub_src         ) params->cam_sub_src          = DEF_FFRECORDER_PARAMS.cam_sub_src;
     if (!params->cam_frame_width     ) params->cam_frame_width      = DEF_FFRECORDER_PARAMS.cam_frame_width;
@@ -119,7 +121,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params)
     if (!params->video_buffer_number ) params->video_buffer_number  = DEF_FFRECORDER_PARAMS.video_buffer_number;
     memcpy(&recorder->params, params, sizeof(FFRECORDER_PARAMS));
 
-    recorder->micdev = (MICDEV*)micdev_init(params->mic_sample_rate);
+    recorder->micdev = (MICDEV*)micdev_init(params->mic_sample_rate, params->mic_channel_num);
     if (!recorder->micdev) {
         printf("failed to init micdev !\n");
         exit(1);

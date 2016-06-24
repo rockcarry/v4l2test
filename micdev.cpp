@@ -8,8 +8,6 @@
 // 内部常量定义
 #define DEF_PCM_CARD      0
 #define DEF_PCM_DEVICE    0
-#define DEF_PCM_CHANNEL   2
-#define DEF_PCM_SAMPRATE  44100
 #define DEF_PCM_FORMAT    PCM_FORMAT_S16_LE
 #define DEF_PCM_BUF_SIZE  2048
 #define DEF_PCM_BUF_COUNT 3
@@ -43,7 +41,7 @@ static void* micdev_capture_thread_proc(void *param)
 
         if (dev->callback) {
             void *data[8] = { dev->buffer };
-            int   sampnum = dev->buflen / (2 * DEF_PCM_CHANNEL);
+            int   sampnum = dev->buflen / (2 * dev->config.channels);
             dev->callback(dev->recorder, data, sampnum);
         }
     }
@@ -52,7 +50,7 @@ static void* micdev_capture_thread_proc(void *param)
 }
 
 // 函数实现
-void* micdev_init(int samprate)
+void* micdev_init(int samprate, int channals)
 {
     MICDEV *dev = (MICDEV*)malloc(sizeof(MICDEV));
     if (!dev) {
@@ -61,8 +59,8 @@ void* micdev_init(int samprate)
     }
     else memset(dev, 0, sizeof(MICDEV));
 
-    dev->config.channels          = DEF_PCM_CHANNEL;
-    dev->config.rate              = DEF_PCM_SAMPRATE;
+    dev->config.channels          = channals;
+    dev->config.rate              = samprate;
     dev->config.period_size       = DEF_PCM_BUF_SIZE;
     dev->config.period_count      = DEF_PCM_BUF_COUNT;
     dev->config.format            = DEF_PCM_FORMAT;
