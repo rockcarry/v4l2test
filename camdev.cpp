@@ -1,6 +1,6 @@
 #define LOG_TAG "camdev"
 
-// °üº¬Í·ÎÄ¼ş
+// åŒ…å«å¤´æ–‡ä»¶
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -9,7 +9,7 @@
 #include "ffencoder.h"
 #include "camdev.h"
 
-// ÄÚ²¿³£Á¿¶¨Òå
+// å†…éƒ¨å¸¸é‡å®šä¹‰
 #define DO_USE_VAR(v)   do { v = v; } while (0)
 #define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
 
@@ -17,7 +17,7 @@
                            | GRALLOC_USAGE_SW_WRITE_NEVER \
                            | GRALLOC_USAGE_HW_TEXTURE
 
-// ÄÚ²¿º¯ÊıÊµÏÖ
+// å†…éƒ¨å‡½æ•°å®ç°
 static int ALIGN(int x, int y) {
     // y must be a power of 2.
     return (x + y - 1) & ~(y - 1);
@@ -102,11 +102,7 @@ static void* camdev_capture_thread_proc(void *param)
     struct timeval tv;
     //-- for select
 
-    while (1) {
-        if (cam->thread_state & CAMDEV_TS_EXIT) {
-            break;
-        }
-
+    while (!(cam->thread_state & CAMDEV_TS_EXIT)) {
         if (cam->thread_state & CAMDEV_TS_PAUSE) {
             usleep(10*1000);
             continue;
@@ -256,7 +252,7 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
     return 0;
 }
 
-// º¯ÊıÊµÏÖ
+// å‡½æ•°å®ç°
 CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
 {
     CAMDEV *cam = (CAMDEV*)malloc(sizeof(CAMDEV));
