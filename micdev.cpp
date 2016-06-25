@@ -1,29 +1,25 @@
 #define LOG_TAG "camdev"
 
-// °üº¬Í·ÎÄ¼ş
+// åŒ…å«å¤´æ–‡ä»¶
 #include <stdlib.h>
 #include <utils/Log.h>
 #include "micdev.h"
 
-// ÄÚ²¿³£Á¿¶¨Òå
+// å†…éƒ¨å¸¸é‡å®šä¹‰
 #define DEF_PCM_CARD      0
 #define DEF_PCM_DEVICE    0
 #define DEF_PCM_FORMAT    PCM_FORMAT_S16_LE
-#define DEF_PCM_BUF_SIZE  2048
+#define DEF_PCM_BUF_SIZE  8192
 #define DEF_PCM_BUF_COUNT 3
 
-// ÄÚ²¿º¯ÊıÊµÏÖ
+// å†…éƒ¨å‡½æ•°å®ç°
 static void* micdev_capture_thread_proc(void *param)
 {
     MICDEV *dev = (MICDEV*)param;
 
-    while (1) {
-        if (dev->thread_state & MICDEV_TS_EXIT) {
-            break;
-        }
-
+    while (!(dev->thread_state & MICDEV_TS_EXIT)) {
         if (dev->thread_state & MICDEV_TS_PAUSE) {
-            usleep(33*1000);
+            usleep(10*1000);
             continue;
         }
 
@@ -44,12 +40,15 @@ static void* micdev_capture_thread_proc(void *param)
             int   sampnum = dev->buflen / (2 * dev->config.channels);
             dev->callback(dev->recorder, data, sampnum);
         }
+
+        // sleep to release cpu
+        usleep(10*1000);
     }
 
     return NULL;
 }
 
-// º¯ÊıÊµÏÖ
+// å‡½æ•°å®ç°
 void* micdev_init(int samprate, int channals)
 {
     MICDEV *dev = (MICDEV*)malloc(sizeof(MICDEV));
