@@ -37,9 +37,9 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     25,                         // cam_frame_rate
 
     // ffencoder output
-    64000,                      // out_audio_bitrate;
+    16000,                      // out_audio_bitrate;
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout;
-    44100,                      // out_audio_samprate;
+    16000,                      // out_audio_samprate;
     512000,                     // out_video_bitrate;
     320,                        // out_video_width;
     200,                        // out_video_height;

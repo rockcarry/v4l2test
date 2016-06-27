@@ -708,8 +708,9 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
 
         aframe = encoder->aframecur;
         for (i=0; i<8; i++) {
-            adatacur[i] = aframe->data[i] + ( (aframe->nb_samples - encoder->asampavail)
-                                            * (16 / 8) * encoder->astream->codec->channels );
+            adatacur[i] = aframe->data[i] + (aframe->nb_samples - encoder->asampavail)
+                                          * av_get_bytes_per_sample(encoder->astream->codec->sample_fmt) 
+                                          * encoder->astream->codec->channels;
         }
 
         sampnum  = swr_convert(encoder->swr_ctx,
