@@ -1,6 +1,7 @@
 // 包含头文件
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include "ffencoder.h"
@@ -148,12 +149,17 @@ static void* audio_encode_thread_proc(void *param)
     memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
-        sem_wait(&encoder->asemr);
-        aframe = &encoder->aframes[encoder->ahead];
-
-        if (encoder->thread_state & FFENCODER_TS_EXIT) {
-            break;
+        if (0 != sem_trywait(&encoder->asemr)) {
+            if (encoder->thread_state & FFENCODER_TS_EXIT) {
+                break;
+            }
+            else {
+                usleep(10*1000);
+                continue;
+            }
         }
+
+        aframe = &encoder->aframes[encoder->ahead];
 
         // encode audio
         ret = avcodec_encode_audio2(encoder->astream->codec, &pkt, aframe, &got);
@@ -194,12 +200,17 @@ static void* video_encode_thread_proc(void *param)
     memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
-        sem_wait(&encoder->vsemr);
-        vframe = &encoder->vframes[encoder->vhead];
-
-        if (encoder->thread_state & FFENCODER_TS_EXIT) {
-            break;
+        if (0 != sem_trywait(&encoder->vsemr)) {
+            if (encoder->thread_state & FFENCODER_TS_EXIT) {
+                break;
+            }
+            else {
+                usleep(10*1000);
+                continue;
+            }
         }
+
+        vframe = &encoder->vframes[encoder->vhead];
 
         // encode & write video
         if (encoder->ofctxt->oformat->flags & AVFMT_RAWPICTURE) {
@@ -644,6 +655,18 @@ void ffencoder_free(void *ctxt)
     FFENCODER *encoder = (FFENCODER*)ctxt;
     if (!ctxt) return;
 
+    //++ post the last audio buffer
+    if (encoder->asampavail < encoder->aframecur->nb_samples / 2) {
+        encoder->aframecur->pts = encoder->next_apts;
+        encoder->next_apts     += encoder->aframecur->nb_samples;
+
+        if (++encoder->atail == encoder->params.audio_buffer_number) {
+            encoder->atail = 0;
+        }
+        sem_post(&encoder->asemr);
+    }
+    //-- post the last audio buffer
+
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
@@ -697,8 +720,8 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
         encoder->asampavail -= sampnum;
 
         if (encoder->asampavail == 0) {
-            encoder->aframecur->pts = encoder->next_apts;
-            encoder->next_apts     += aframe->nb_samples;
+            aframe->pts         = encoder->next_apts;
+            encoder->next_apts += aframe->nb_samples;
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
                 encoder->atail = 0;
