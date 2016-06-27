@@ -14,8 +14,7 @@ typedef struct
     FFRECORDER_PARAMS params;
     MICDEV           *micdev;
     CAMDEV           *camdev;
-    void             *encoder0;
-    void             *encoder1;
+    void             *encoder;
     #define FRF_RECORDING   (1 << 1 )
     #define FRF_RECORD_REQ  (1 << 2 )
     #define FRF_RECORD_MACK (1 << 16)
@@ -27,7 +26,7 @@ typedef struct
 static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 {
     // micdev input params
-    32000,                      // mic_sample_rate
+    44100,                      // mic_sample_rate
     2,                          // mic_channel_num
 
     // camdev input params
@@ -38,9 +37,9 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     25,                         // cam_frame_rate
 
     // ffencoder output
-    16000,                      // out_audio_bitrate;
+    64000,                      // out_audio_bitrate;
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout;
-    16000,                      // out_audio_samprate;
+    44100,                      // out_audio_samprate;
     512000,                     // out_video_bitrate;
     320,                        // out_video_width;
     200,                        // out_video_height;
@@ -48,8 +47,8 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 
     // other params
     SWS_POINT,                  // scale_flags;
-    6,                          // audio_buffer_number;
-    6,                          // video_buffer_number;
+    5,                          // audio_buffer_number;
+    5,                          // video_buffer_number;
 };
 
 // 内部函数实现
@@ -61,13 +60,11 @@ int micdev_capture_callback_proc(void *r, void *data[8], int nbsample)
         recorder->state |= (FRF_RECORDING|FRF_RECORD_MACK);
         if (recorder->state & FRF_RECORD_CACK) {
             recorder->state &= ~(FRF_RECORD_REQ|FRF_RECORD_MACK|FRF_RECORD_CACK);
-            ffencoder_free(recorder->encoder1);
-            recorder->encoder1 = NULL;
         }
     }
 
     if (recorder->state & FRF_RECORDING) {
-        ffencoder_audio(recorder->encoder0, data, nbsample);
+        ffencoder_audio(recorder->encoder, data, nbsample);
     }
 
     return 0;
@@ -81,13 +78,11 @@ int camdev_capture_callback_proc(void *r, void *data[8], int linesize[8])
         recorder->state |= (FRF_RECORDING|FRF_RECORD_CACK);
         if (recorder->state & FRF_RECORD_MACK) {
             recorder->state &= ~(FRF_RECORD_REQ|FRF_RECORD_MACK|FRF_RECORD_CACK);
-            ffencoder_free(recorder->encoder1);
-            recorder->encoder1 = NULL;
         }
     }
 
     if (recorder->state & FRF_RECORDING) {
-        ffencoder_video(recorder->encoder0, data, linesize);
+        ffencoder_video(recorder->encoder, data, linesize);
     }
 
     return 0;
@@ -200,6 +195,7 @@ void ffrecorder_preview_stop(void *ctxt)
 void ffrecorder_record_start(void *ctxt, char *filename)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    void       *last_enc = NULL;
     if (!recorder) return;
 
     // switch to a new ffencoder for recording
@@ -224,27 +220,35 @@ void ffrecorder_record_start(void *ctxt, char *filename)
     encoder_params.scale_flags             = recorder->params.scale_flags;
     encoder_params.audio_buffer_number     = recorder->params.audio_buffer_number;
     encoder_params.video_buffer_number     = recorder->params.video_buffer_number;
-    recorder->encoder1 = recorder->encoder0;
-    recorder->encoder0 = ffencoder_init(&encoder_params);
-    if (!recorder->encoder0) {
+    last_enc          = recorder->encoder;
+    recorder->encoder = ffencoder_init(&encoder_params);
+    if (!recorder->encoder) {
         printf("failed to init encoder !\n");
         exit(1);
     }
 
-    // set request recording flag
+    // set request recording flag and wait switch done
     recorder->state |= FRF_RECORD_REQ;
+    while (recorder->state & FRF_RECORD_REQ) usleep(10*1000);
+
+    // free last encoder
+    ffencoder_free(last_enc);
 }
 
 void ffrecorder_record_stop(void *ctxt)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    void       *last_enc = NULL;
     if (!recorder) return;
 
-    recorder->encoder1 = recorder->encoder0;
-    recorder->encoder0 = NULL;
+    last_enc          = recorder->encoder;
+    recorder->encoder = NULL;
 
     recorder->state |= FRF_RECORD_REQ;
     while (recorder->state & FRF_RECORD_REQ) usleep(10*1000);
     recorder->state &=~FRF_RECORDING;
+
+    // free last encoder
+    ffencoder_free(last_enc);
 }
 
