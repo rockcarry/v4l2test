@@ -9,8 +9,8 @@
 #define DEF_PCM_CARD      0
 #define DEF_PCM_DEVICE    0
 #define DEF_PCM_FORMAT    PCM_FORMAT_S16_LE
-#define DEF_PCM_BUF_SIZE  8192
-#define DEF_PCM_BUF_COUNT 3
+#define DEF_PCM_BUF_SIZE  4096
+#define DEF_PCM_BUF_COUNT 5
 
 // 内部函数实现
 static void* micdev_capture_thread_proc(void *param)
