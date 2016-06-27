@@ -1,3 +1,2 @@
-1. ffencoder_video 和 ffencoder_audio 需改为非阻塞方式，以适应 streaming 的需求
-2. 实现 live streaming 直播流功能
-3. 实现对多摄像头的支持
+1. 实现 live streaming 直播流功能
+2. 实现对多摄像头的支持

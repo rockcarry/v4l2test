@@ -40,7 +40,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     16000,                      // out_audio_bitrate;
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout;
     16000,                      // out_audio_samprate;
-    512000,                     // out_video_bitrate;
+    384000,                     // out_video_bitrate;
     320,                        // out_video_width;
     200,                        // out_video_height;
     15,                         // out_video_frate;

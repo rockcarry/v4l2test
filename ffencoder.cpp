@@ -655,18 +655,6 @@ void ffencoder_free(void *ctxt)
     FFENCODER *encoder = (FFENCODER*)ctxt;
     if (!ctxt) return;
 
-    //++ post the last audio buffer
-    if (encoder->asampavail < encoder->aframecur->nb_samples / 2) {
-        encoder->aframecur->pts = encoder->next_apts;
-        encoder->next_apts     += encoder->aframecur->nb_samples;
-
-        if (++encoder->atail == encoder->params.audio_buffer_number) {
-            encoder->atail = 0;
-        }
-        sem_post(&encoder->asemr);
-    }
-    //-- post the last audio buffer
-
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
@@ -713,9 +701,7 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
                                           * encoder->astream->codec->channels;
         }
 
-        sampnum  = swr_convert(encoder->swr_ctx,
-                        adatacur, encoder->asampavail,
-                        (const uint8_t**)data, nbsample);
+        sampnum  = swr_convert(encoder->swr_ctx, adatacur, encoder->asampavail, (const uint8_t**)data, nbsample);
         data     = NULL;
         nbsample = 0;
         encoder->asampavail -= sampnum;
@@ -753,6 +739,7 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     }
 
     sem_wait(&encoder->vsemw);
+
     vframe = &encoder->vframes[encoder->vtail];
 
     // scale video image
