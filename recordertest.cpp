@@ -1,11 +1,19 @@
 #include <cutils/properties.h>
 #include "ffrecorder.h"
 
+static uint64_t get_tick_count()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
 int main(int argc, char *argv[])
 {
-    void *recorder = NULL;
-    char  file[128];
-    int   i = 0;
+    void    *recorder = NULL;
+    char     file[128];
+    uint64_t curtick  = 0;
+    int      i        = 0;
 
     // set exit flag to 0
     property_set("sys.ffrecorder.test.exit", "0");
@@ -40,21 +48,20 @@ int main(int argc, char *argv[])
     ffrecorder_preview_window(recorder, win);
     ffrecorder_preview_start (recorder);
 
-    // start record
-    ffrecorder_record_start(recorder, (char*)"/sdcard/test000.mp4");
-
     // wait exit
     while (1) {
+        if (get_tick_count() - curtick > 60 * 1000) {
+            curtick = get_tick_count();
+            sprintf(file, "/sdcard/test%03d.mp4", i++);
+            ffrecorder_record_start(recorder, file);
+        }
+
         char exit[PROP_VALUE_MAX];
         property_get("sys.ffrecorder.test.exit", exit, "0");
         if (strcmp(exit, "1") == 0) {
             break;
         }
 
-        if (++i % 600 == 0) {
-            sprintf(file, "/sdcard/test%03d.mp4", i / 600);
-            ffrecorder_record_start(recorder, file);
-        }
         usleep(100*1000);
     }
 
