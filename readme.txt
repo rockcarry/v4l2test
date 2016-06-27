@@ -34,8 +34,8 @@ How to build
 2. using NDK or android build environment to build test program
 
 
-Implemented feature
-===================
+Features
+========
 1.  audio capture from tinyalsa
 2.  video capture from v4l2
 3.  audio & video encoding into mp4
