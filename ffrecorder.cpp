@@ -47,8 +47,8 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 
     // other params
     SWS_POINT,                  // scale_flags;
-    5,                          // audio_buffer_number;
-    5,                          // video_buffer_number;
+    8,                          // audio_buffer_number;
+    3,                          // video_buffer_number;
 };
 
 // 内部函数实现

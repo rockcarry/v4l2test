@@ -62,6 +62,7 @@ typedef struct
     AVFrame           *aframes;
     int64_t            next_apts;
     AVFrame           *aframecur;
+    AVFrame            aframetmp;
     int                asampavail;
     sem_t              asemr;
     sem_t              asemw;
@@ -118,8 +119,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     0,                          // start_apts
     0,                          // start_vpts
     SWS_FAST_BILINEAR,          // scale_flags
-    5,                          // audio_buffer_number
-    5,                          // video_buffer_number
+    8,                          // audio_buffer_number
+    3,                          // video_buffer_number
 };
 
 // 内部函数实现
@@ -435,6 +436,9 @@ static void open_audio(FFENCODER *encoder)
             c->frame_size);
     }
 
+    // allocate temp audio frame
+    alloc_audio_frame(&encoder->aframetmp, c->sample_fmt, c->channel_layout, c->sample_rate, c->frame_size);
+
     sem_init(&encoder->asemr, 0, 0                                  );
     sem_init(&encoder->asemw, 0, encoder->params.audio_buffer_number);
 
@@ -526,6 +530,9 @@ static void close_astream(FFENCODER *encoder)
     }
     free(encoder->aframes);
     //-- for audio frames
+
+    // free temp audio frame
+    av_frame_unref(&encoder->aframetmp);
 
     avcodec_close(encoder->astream->codec);
     swr_free(&encoder->swr_ctx);
@@ -689,7 +696,18 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
     do {
         // resample audio
         if (encoder->asampavail == 0) {
-            sem_wait(&encoder->asemw);
+            if (0 != sem_trywait(&encoder->asemw)) {
+//              printf("audio frame dropped by encoder !\n");
+                do {
+                    sampnum  = swr_convert(encoder->swr_ctx,
+                        (uint8_t**)encoder->aframetmp.data, encoder->aframetmp.nb_samples,
+                        (const uint8_t**)data, nbsample);
+                    data     = NULL;
+                    nbsample = 0;
+                    encoder->next_apts += sampnum;
+                } while (sampnum > 0);
+                return -1;
+            }
             encoder->aframecur  = &encoder->aframes[encoder->atail];
             encoder->asampavail =  encoder->aframes[encoder->atail].nb_samples;
         }
@@ -738,7 +756,11 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
         return 0;
     }
 
-    sem_wait(&encoder->vsemw);
+    if (0 != sem_trywait(&encoder->vsemw)) {
+//      printf("video frame dropped by encoder !\n");
+        encoder->next_vpts++;
+        return -1;
+    }
 
     vframe = &encoder->vframes[encoder->vtail];
 
