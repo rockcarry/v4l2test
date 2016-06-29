@@ -107,23 +107,27 @@ void micdev_close(MICDEV *dev)
 
 void micdev_start_capture(MICDEV *dev)
 {
+    if (!dev) return;
     // start capture
     dev->thread_state &= ~MICDEV_TS_PAUSE;
 }
 
 void micdev_stop_capture(MICDEV *dev)
 {
+    if (!dev) return;
     // stop capture
     dev->thread_state |= MICDEV_TS_PAUSE;
 }
 
 void micdev_set_mute(MICDEV *dev, int mute)
 {
+    if (!dev) return;
     dev->mute = mute;
 }
 
 void micdev_set_callback(MICDEV *dev, MICDEV_CAPTURE_CALLBACK callback, void *recorder)
 {
+    if (!dev) return;
     dev->callback = callback;
     dev->recorder = recorder;
 }
