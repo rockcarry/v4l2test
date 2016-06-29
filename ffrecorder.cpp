@@ -56,17 +56,13 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 int micdev_capture_callback_proc(void *r, void *data[8], int nbsample)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
-    if (recorder->state & FRF_RECORD_REQ) {
-        recorder->state |= (FRF_RECORDING|FRF_RECORD_MACK);
-        if (recorder->state & FRF_RECORD_CACK) {
-            recorder->state &= ~(FRF_RECORD_REQ|FRF_RECORD_MACK|FRF_RECORD_CACK);
-        }
-    }
-
     if (recorder->state & FRF_RECORDING) {
+        if (!(recorder->state & FRF_RECORD_REQ)) {
+            recorder->state |= FRF_RECORD_MACK;
+        }
         ffencoder_audio(recorder->encoder, data, nbsample);
+        recorder->state &= ~FRF_RECORD_MACK;
     }
-
     return 0;
 }
 
@@ -74,17 +70,13 @@ int micdev_capture_callback_proc(void *r, void *data[8], int nbsample)
 int camdev_capture_callback_proc(void *r, void *data[8], int linesize[8])
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
-    if (recorder->state & FRF_RECORD_REQ) {
-        recorder->state |= (FRF_RECORDING|FRF_RECORD_CACK);
-        if (recorder->state & FRF_RECORD_MACK) {
-            recorder->state &= ~(FRF_RECORD_REQ|FRF_RECORD_MACK|FRF_RECORD_CACK);
-        }
-    }
-
     if (recorder->state & FRF_RECORDING) {
+        if (!(recorder->state & FRF_RECORD_REQ)) {
+            recorder->state |= FRF_RECORD_CACK;
+        }
         ffencoder_video(recorder->encoder, data, linesize);
+        recorder->state &= ~FRF_RECORD_CACK;
     }
-
     return 0;
 }
 
@@ -228,8 +220,9 @@ void ffrecorder_record_start(void *ctxt, char *filename)
     }
 
     // set request recording flag and wait switch done
-    recorder->state |= FRF_RECORD_REQ;
-    while (recorder->state & FRF_RECORD_REQ) usleep(10*1000);
+    recorder->state |= (FRF_RECORD_REQ|FRF_RECORDING);
+    while (recorder->state & (FRF_RECORD_MACK|FRF_RECORD_CACK)) usleep(10*1000);
+    recorder->state &=~(FRF_RECORD_REQ);
 
     // free last encoder
     ffencoder_free(last_enc);
@@ -244,9 +237,9 @@ void ffrecorder_record_stop(void *ctxt)
     last_enc          = recorder->encoder;
     recorder->encoder = NULL;
 
-    recorder->state |= FRF_RECORD_REQ;
-    while (recorder->state & FRF_RECORD_REQ) usleep(10*1000);
-    recorder->state &=~FRF_RECORDING;
+    recorder->state |= (FRF_RECORD_REQ|FRF_RECORDING);
+    while (recorder->state & (FRF_RECORD_MACK|FRF_RECORD_CACK)) usleep(10*1000);
+    recorder->state &=~(FRF_RECORD_REQ|FRF_RECORDING);
 
     // free last encoder
     ffencoder_free(last_enc);

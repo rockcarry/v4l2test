@@ -518,7 +518,6 @@ static void close_astream(FFENCODER *encoder)
     int i;
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
-    sem_post(&encoder->asemr);
     pthread_join(encoder->aencode_thread_id, NULL);
 
     sem_destroy(&encoder->asemr);
@@ -543,7 +542,6 @@ static void close_vstream(FFENCODER *encoder)
     int i;
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
-    sem_post(&encoder->vsemr);
     pthread_join(encoder->vencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);
