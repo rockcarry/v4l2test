@@ -45,6 +45,7 @@ Features
 7.  change frame rate when recording
 9.  optimized for allwinner A33 platorm
 10. record segmented video with out dropping any frame
+11. auto drop frame when could't encoding in time
 
 
 TODO
@@ -66,10 +67,6 @@ support live streaming video to http or rtmp
 
 rockcarry
 2016-6-22
-
-
-
-
 
 
 
