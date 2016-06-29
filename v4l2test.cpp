@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     sp<ANativeWindow> win = surface;
 
     // init camdev
-    cam = camdev_init(dev, sub, w, h, 0);
+    cam = camdev_init(dev, sub, w, h, 30);
     if (!cam) {
         printf("failed to create camdev !\n");
         exit(1);
