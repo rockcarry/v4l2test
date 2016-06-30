@@ -45,15 +45,16 @@ int main(int argc, char *argv[])
     recorder = ffrecorder_init(NULL);
 
     // startpreview
-    ffrecorder_preview_window(recorder, win);
-    ffrecorder_preview_start (recorder);
+    ffrecorder_preview_window(recorder, 0, win);
+    ffrecorder_preview_start (recorder, 0);
 
     // wait exit
     while (1) {
         if (get_tick_count() - curtick > 60 * 1000) {
             curtick = get_tick_count();
             sprintf(file, "/sdcard/test%03d.mp4", i++);
-            ffrecorder_record_start(recorder, file);
+            ffrecorder_record_start(recorder, 0, file);
+            ffrecorder_record_start(recorder,-1, NULL);
         }
 
         char exit[PROP_VALUE_MAX];
@@ -66,10 +67,11 @@ int main(int argc, char *argv[])
     }
 
     // stop record
-    ffrecorder_record_stop(recorder);
+    ffrecorder_record_stop(recorder, 0);
+    ffrecorder_record_stop(recorder,-1);
 
     // stop preview
-    ffrecorder_preview_stop(recorder);
+    ffrecorder_preview_stop(recorder, 0);
 
     // close camdev
     ffrecorder_free(recorder);

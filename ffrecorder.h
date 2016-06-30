@@ -9,6 +9,11 @@
 
 using namespace android;
 
+// 常量定义
+#define MAX_MICDEV_NUM     1
+#define MAX_CAMDEV_NUM     2
+#define MAX_ENCODER_NUM    3
+
 // 类型定义
 typedef struct
 {
@@ -17,36 +22,56 @@ typedef struct
     int   mic_channel_num;
 
     // camdev input params
-    char *cam_dev_name;
-    int   cam_sub_src;
-    int   cam_frame_width;
-    int   cam_frame_height;
-    int   cam_frame_rate;
+    char *cam_dev_name_0;
+    int   cam_sub_src_0;
+    int   cam_frame_width_0;
+    int   cam_frame_height_0;
+    int   cam_frame_rate_0;
+
+    char *cam_dev_name_1;
+    int   cam_sub_src_1;
+    int   cam_frame_width_1;
+    int   cam_frame_height_1;
+    int   cam_frame_rate_1;
 
     // ffencoder output
-    int   out_audio_bitrate;
-    int   out_audio_chlayout;
-    int   out_audio_samprate;
-    int   out_video_bitrate;
-    int   out_video_width;
-    int   out_video_height;
-    int   out_video_frate;
+    int   out_audio_bitrate_0;
+    int   out_audio_chlayout_0;
+    int   out_audio_samprate_0;
+    int   out_video_bitrate_0;
+    int   out_video_width_0;
+    int   out_video_height_0;
+    int   out_video_frate_0;
 
-    // other params
-    int   scale_flags;
-    int   audio_buffer_number;
-    int   video_buffer_number;
+    int   out_audio_bitrate_1;
+    int   out_audio_chlayout_1;
+    int   out_audio_samprate_1;
+    int   out_video_bitrate_1;
+    int   out_video_width_1;
+    int   out_video_height_1;
+    int   out_video_frate_1;
+
+    int   out_audio_bitrate_2;
+    int   out_audio_chlayout_2;
+    int   out_audio_samprate_2;
+    int   out_video_bitrate_2;
+    int   out_video_width_2;
+    int   out_video_height_2;
+    int   out_video_frate_2;
 } FFRECORDER_PARAMS;
 
 // 函数定义
 void *ffrecorder_init(FFRECORDER_PARAMS *params);
 void  ffrecorder_free(void *ctxt);
-void  ffrecorder_preview_window(void *ctxt, const sp<ANativeWindow> win);
-void  ffrecorder_preview_target(void *ctxt, const sp<IGraphicBufferProducer>& gbp);
-void  ffrecorder_preview_start (void *ctxt);
-void  ffrecorder_preview_stop  (void *ctxt);
-void  ffrecorder_record_start  (void *ctxt, char *filename);
-void  ffrecorder_record_stop   (void *ctxt);
+void  ffrecorder_reset_camdev  (void *ctxt, int camidx, int w, int h, int frate);
+void  ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win);
+void  ffrecorder_preview_target(void *ctxt, int camidx, const sp<IGraphicBufferProducer>& gbp);
+void  ffrecorder_preview_start (void *ctxt, int camidx);
+void  ffrecorder_preview_stop  (void *ctxt, int camidx);
+void  ffrecorder_record_start  (void *ctxt, int encidx, char *filename);
+void  ffrecorder_record_stop   (void *ctxt, int encidx);
+void  ffrecorder_record_audio_source(void *ctxt, int encidx, int source);
+void  ffrecorder_record_video_source(void *ctxt, int encidx, int source);
 
 #endif
 
