@@ -11,7 +11,9 @@ static uint64_t get_tick_count()
 int main(int argc, char *argv[])
 {
     void    *recorder = NULL;
-    char     file[128];
+    char     filea[128];
+    char     fileb[128];
+    char     filec[128];
     uint64_t curtick  = 0;
     int      i        = 0;
 
@@ -52,9 +54,13 @@ int main(int argc, char *argv[])
     while (1) {
         if (get_tick_count() - curtick > 60 * 1000) {
             curtick = get_tick_count();
-            sprintf(file, "/sdcard/test%03d.mp4", i++);
-            ffrecorder_record_start(recorder, 0, file);
-            ffrecorder_record_start(recorder,-1, NULL);
+            sprintf(filea, "/sdcard/a_test%03d.mp4", i);
+            sprintf(fileb, "/sdcard/b_test%03d.mp4", i);
+            sprintf(filec, "/sdcard/c_test%03d.mp4", i); i++;
+            ffrecorder_record_start(recorder, 0, filea);
+            ffrecorder_record_start(recorder, 1, fileb);
+//          ffrecorder_record_start(recorder, 2, filec);
+            ffrecorder_record_start(recorder,-1, NULL );
         }
 
         char exit[PROP_VALUE_MAX];
@@ -68,6 +74,8 @@ int main(int argc, char *argv[])
 
     // stop record
     ffrecorder_record_stop(recorder, 0);
+    ffrecorder_record_stop(recorder, 1);
+//  ffrecorder_record_stop(recorder, 2);
     ffrecorder_record_stop(recorder,-1);
 
     // stop preview

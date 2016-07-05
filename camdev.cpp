@@ -378,8 +378,6 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
 
 void camdev_close(CAMDEV *cam)
 {
-    int i;
-
     if (!cam) return;
 
     // wait thread safely exited
@@ -387,7 +385,7 @@ void camdev_close(CAMDEV *cam)
     pthread_join(cam->thread_id, NULL);
 
     // unmap buffers
-    for (i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
+    for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
         munmap(cam->vbs[i].addr, cam->vbs[i].len);
     }
 
@@ -403,14 +401,14 @@ void camdev_close(CAMDEV *cam)
 
 void camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win)
 {
-    if (cam) {
-        cam->new_win     = win;
-        cam->update_flag = 1;
-    }
+    if (!cam) return;
+    cam->new_win     = win;
+    cam->update_flag = 1;
 }
 
 void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp)
 {
+    if (!cam) return;
     sp<ANativeWindow> win;
     if (gbp != 0) {
         // Using controlledByApp flag to ensure that the buffer queue remains in
@@ -424,7 +422,7 @@ void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gb
 void camdev_capture_start(CAMDEV *cam)
 {
     // check fd valid
-    if (cam->fd <= 0) return;
+    if (!cam || cam->fd <= 0) return;
 
     // turn on stream
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -437,7 +435,7 @@ void camdev_capture_start(CAMDEV *cam)
 void camdev_capture_stop(CAMDEV *cam)
 {
     // check fd valid
-    if (cam->fd <= 0) return;
+    if (!cam || cam->fd <= 0) return;
 
     // pause thread
     cam->thread_state |= CAMDEV_TS_PAUSE;
@@ -449,18 +447,21 @@ void camdev_capture_stop(CAMDEV *cam)
 
 void camdev_preview_start(CAMDEV *cam)
 {
+    if (!cam) return;
     // set start prevew flag
     cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
 void camdev_preview_stop(CAMDEV *cam)
 {
+    if (!cam) return;
     // set stop prevew flag
     cam->thread_state &= ~CAMDEV_TS_PREVIEW;
 }
 
 void camdev_set_callback(CAMDEV *cam, CAMDEV_CAPTURE_CALLBACK callback, void *recorder)
 {
+    if (!cam) return;
     cam->callback = callback;
     cam->recorder = recorder;
 }

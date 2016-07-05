@@ -316,7 +316,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     int         vwidth    = 0;
     int         vheight   = 0;
     int         vfrate    = 0;
-    if (!recorder || encidx < 0 || encidx >= MAX_ENCODER_NUM) return;
+    if (!recorder || encidx < -1 || encidx >= MAX_ENCODER_NUM) return;
 
     if (encidx == -1) {
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
@@ -398,7 +398,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
 void ffrecorder_record_stop(void *ctxt, int encidx)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
-    if (!recorder) return;
+    if (!recorder || encidx < -1 || encidx >= MAX_ENCODER_NUM) return;
 
     if (encidx == -1) {
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
