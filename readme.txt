@@ -53,15 +53,12 @@ TODO
 1.  implments hardware encoding for A33 platfrom
 I plan to write a hardware H264 encoding ffmpeg codec for A33 platform
 
-2.  multi camera support
-support at least two camera, preview and recording at the same time
-
-3.  live streaming
+2.  live streaming
 support live streaming video to http or rtmp
 
-4.  support capture audio from android.media.AudioRecord
+3.  support capture audio from android.media.AudioRecord
 
-5.  stability and performance
+4.  stability and performance
 
 
 
