@@ -1,5 +1,5 @@
-#ifndef __MICDEV_TINYALSA_H__
-#define __MICDEV_TINYALSA_H__
+#ifndef _MICDEV_TINYALSA_H_
+#define _MICDEV_TINYALSA_H_
 
 #ifdef __cplusplus
 extern "C" {

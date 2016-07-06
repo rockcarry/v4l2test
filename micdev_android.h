@@ -1,12 +1,12 @@
-#ifndef __MICDEV_ANDROID_H__
-#define __MICDEV_ANDROID_H__
+#ifndef _MICDEV_ANDROID_H_
+#define _MICDEV_ANDROID_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // º¯Êý¶¨Òå
-void* micdev_android_init (void *env, int samprate, int channels);
+void* micdev_android_init (int samprate, int channels, void *extra);
 void  micdev_android_close(void *ctxt);
 void  micdev_android_start_capture(void *ctxt);
 void  micdev_android_stop_capture (void *ctxt);
