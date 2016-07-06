@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 // º¯Êý¶¨Òå
-void* micdev_tinyalsa_init (void *env, int samprate, int channels);
+void* micdev_tinyalsa_init (int samprate, int channels, void *extra);
 void  micdev_tinyalsa_close(void *ctxt);
 void  micdev_tinyalsa_start_capture(void *ctxt);
 void  micdev_tinyalsa_stop_capture (void *ctxt);

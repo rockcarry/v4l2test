@@ -22,10 +22,10 @@ static void* micdev_capture_thread_proc(void *param)
 }
 
 // 函数实现
-void* micdev_android_init (void *env, int samprate, int channels) { return NULL ;}
+void* micdev_android_init(int samprate, int channels, void *extra) { return NULL; }
 void  micdev_android_close(void *ctxt) {}
 void  micdev_android_start_capture(void *ctxt) {}
-void  micdev_android_stop_capture (void *ctxt) {}
-void  micdev_android_set_mute     (void *ctxt, int mute) {}
-void  micdev_android_set_callback (void *ctxt, void *callback, void *recorder) {}
+void  micdev_android_stop_capture(void *ctxt) {}
+void  micdev_android_set_mute(void *ctxt, int mute) {}
+void  micdev_android_set_callback(void *ctxt, void *callback, void *recorder) {}
 

@@ -13,12 +13,15 @@
 #define MICDEV_TS_PAUSE  (1 << 1)
 
 #define MICDEV_COMMON \
-    uint8_t          *buffer; \
-    int               buflen; \
-    int               mute;   \
-    pthread_t         thread_id;    \
-    int               thread_state; \
-    void             *recorder;     \
+    void            *extra;   \
+    int              channels;\
+    int              samprate;\
+    uint8_t         *buffer;  \
+    int              buflen;  \
+    int              mute;    \
+    pthread_t        thread_id;    \
+    int              thread_state; \
+    void            *recorder;     \
     MICDEV_CAPTURE_CALLBACK callback;
 
 #ifdef USE_MICDEV_ANDROID

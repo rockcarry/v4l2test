@@ -35,7 +35,7 @@ static void* micdev_capture_thread_proc(void *param)
         }
 
         if (mic->mute) {
-            memset(mic->pcm, 0, mic->buflen);
+            memset(mic->buffer, 0, mic->buflen);
         }
         else {
             // read data from pcm
@@ -60,16 +60,19 @@ static void* micdev_capture_thread_proc(void *param)
 }
 
 // 函数实现
-void* micdev_tinyalsa_init(void *env, int samprate, int channals)
+void* micdev_tinyalsa_init(int samprate, int channels, void *extra)
 {
     MICDEV *mic = (MICDEV*)malloc(sizeof(MICDEV));
     if (!mic) {
         ALOGE("failed to allocate micdev context !\n");
-        goto failed;
+        return NULL;
     }
     else memset(mic, 0, sizeof(MICDEV));
 
-    mic->config.channels          = channals;
+    mic->samprate = samprate;
+    mic->channels = channels;
+    mic->extra    = extra;
+    mic->config.channels          = channels;
     mic->config.rate              = samprate;
     mic->config.period_size       = DEF_PCM_BUF_SIZE;
     mic->config.period_count      = DEF_PCM_BUF_COUNT;
