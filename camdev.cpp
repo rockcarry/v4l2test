@@ -5,17 +5,56 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <linux/videodev2.h>
 #include <utils/Log.h>
 #include "ffencoder.h"
 #include "camdev.h"
 
+extern "C" {
+#include "libswscale/swscale.h"
+}
+
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
-#define DEF_WIN_PIX_FMT HAL_PIXEL_FORMAT_YCrCb_420_SP // HAL_PIXEL_FORMAT_RGBX_8888  // HAL_PIXEL_FORMAT_YCrCb_420_SP
+#define VIDEO_CAPTURE_BUFFER_COUNT  3
+#define NATIVE_WIN_BUFFER_COUNT     3
+#define DEF_WIN_PIX_FMT         HAL_PIXEL_FORMAT_YCrCb_420_SP // HAL_PIXEL_FORMAT_RGBX_8888 or HAL_PIXEL_FORMAT_YCrCb_420_SP
+#define CAMDEV_GRALLOC_USAGE    GRALLOC_USAGE_SW_READ_NEVER \
+                                    | GRALLOC_USAGE_SW_WRITE_NEVER \
+                                    | GRALLOC_USAGE_HW_TEXTURE
 
-#define CAMDEV_GRALLOC_USAGE GRALLOC_USAGE_SW_READ_NEVER \
-                           | GRALLOC_USAGE_SW_WRITE_NEVER \
-                           | GRALLOC_USAGE_HW_TEXTURE
+// 内部类型定义
+struct video_buffer {
+    void    *addr;
+    unsigned len;
+};
+
+// camdev context
+typedef struct {
+    struct v4l2_buffer      buf;
+    struct video_buffer     vbs[VIDEO_CAPTURE_BUFFER_COUNT];
+    int                     fd;
+    sp<ANativeWindow>       new_win;
+    sp<ANativeWindow>       cur_win;
+    int                     win_w;
+    int                     win_h;
+    #define CAMDEV_TS_EXIT       (1 << 0)
+    #define CAMDEV_TS_PAUSE      (1 << 1)
+    #define CAMDEV_TS_PREVIEW    (1 << 2)
+    #define CAMDEV_TS_TEST_FRATE (1 << 3)
+    pthread_t               thread_id;
+    int                     thread_state;
+    int                     update_flag;
+    int                     cam_pixfmt;
+    int                     cam_stride;
+    int                     cam_w;
+    int                     cam_h;
+    int                     cam_frate; // camdev frame rate get from v4l2 interface
+    int                     act_frate; // camdev frame rate actual get by test frame
+    SwsContext             *swsctxt;
+    CAMDEV_CAPTURE_CALLBACK callback;
+    void                   *recorder;
+} CAMDEV;
 
 // 内部函数实现
 static int ALIGN(int x, int y) {
@@ -23,7 +62,7 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
-static uint64_t get_tick_count()
+static uint64_t get_tick_count(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -253,7 +292,7 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
 }
 
 // 函数实现
-CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
+void* camdev_init(const char *dev, int sub, int w, int h, int frate)
 {
     CAMDEV *cam = (CAMDEV*)malloc(sizeof(CAMDEV));
     if (!cam) {
@@ -376,8 +415,9 @@ CAMDEV* camdev_init(const char *dev, int sub, int w, int h, int frate)
     return cam;
 }
 
-void camdev_close(CAMDEV *cam)
+void camdev_close(void *ctxt)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
 
     // wait thread safely exited
@@ -399,15 +439,17 @@ void camdev_close(CAMDEV *cam)
     free(cam);
 }
 
-void camdev_set_preview_window(CAMDEV *cam, const sp<ANativeWindow> win)
+void camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     cam->new_win     = win;
     cam->update_flag = 1;
 }
 
-void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gbp)
+void camdev_set_preview_target(void *ctxt, const sp<IGraphicBufferProducer>& gbp)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     sp<ANativeWindow> win;
     if (gbp != 0) {
@@ -419,8 +461,9 @@ void camdev_set_preview_target(CAMDEV *cam, const sp<IGraphicBufferProducer>& gb
     camdev_set_preview_window(cam, win);
 }
 
-void camdev_capture_start(CAMDEV *cam)
+void camdev_capture_start(void *ctxt)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     // check fd valid
     if (!cam || cam->fd <= 0) return;
 
@@ -432,8 +475,9 @@ void camdev_capture_start(CAMDEV *cam)
     cam->thread_state &= ~CAMDEV_TS_PAUSE;
 }
 
-void camdev_capture_stop(CAMDEV *cam)
+void camdev_capture_stop(void *ctxt)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     // check fd valid
     if (!cam || cam->fd <= 0) return;
 
@@ -445,25 +489,53 @@ void camdev_capture_stop(CAMDEV *cam)
     ioctl(cam->fd, VIDIOC_STREAMOFF, &type);
 }
 
-void camdev_preview_start(CAMDEV *cam)
+void camdev_preview_start(void *ctxt)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     // set start prevew flag
     cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
-void camdev_preview_stop(CAMDEV *cam)
+void camdev_preview_stop(void *ctxt)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     // set stop prevew flag
     cam->thread_state &= ~CAMDEV_TS_PREVIEW;
 }
 
-void camdev_set_callback(CAMDEV *cam, CAMDEV_CAPTURE_CALLBACK callback, void *recorder)
+void camdev_set_callback(void *ctxt, void *callback, void *recorder)
 {
+    CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
-    cam->callback = callback;
+    cam->callback = (CAMDEV_CAPTURE_CALLBACK)callback;
     cam->recorder = recorder;
+}
+
+void camdev_set_param(void *ctxt, int id, int value)
+{
+    // todo...
+}
+
+int camdev_get_param(void *ctxt, int id)
+{
+    CAMDEV *cam = (CAMDEV*)ctxt;
+    if (!cam) return 0;
+    switch (id) {
+    case CAMDEV_PARAM_VIDEO_WIDTH:
+        return cam->cam_w;
+    case CAMDEV_PARAM_VIDEO_HEIGHT:
+        return cam->cam_h;
+    case CAMDEV_PARAM_VIDEO_PIXFMT:
+        return cam->cam_pixfmt;
+    case CAMDEV_PARAM_VIDEO_FRATE:
+        for (int i=0; i<50 && cam->act_frate==0; i++) {
+            usleep(10*1000);
+        }
+        return cam->act_frate;
+    }
+    return 0;
 }
 
 int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt)

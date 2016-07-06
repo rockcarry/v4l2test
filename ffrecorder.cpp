@@ -12,8 +12,8 @@ extern "C" {
 typedef struct
 {
     FFRECORDER_PARAMS params;
-    MICDEV           *micdev [MAX_MICDEV_NUM ];
-    CAMDEV           *camdev [MAX_CAMDEV_NUM ];
+    void             *micdev [MAX_MICDEV_NUM ];
+    void             *camdev [MAX_CAMDEV_NUM ];
     void             *encoder[MAX_ENCODER_NUM];
     void             *enclose[MAX_ENCODER_NUM];
     #define FRF_RECORDING   (1 << 1 )
@@ -180,7 +180,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params)
     recorder->video_source[1] = 1;
     recorder->video_source[2] =-1;
 
-    recorder->micdev[0] = (MICDEV*)micdev_init(params->mic_sample_rate, params->mic_channel_num);
+    recorder->micdev[0] = micdev_init(NULL, params->mic_sample_rate, params->mic_channel_num);
     if (!recorder->micdev[0]) {
         printf("failed to init micdev !\n");
     }
@@ -205,13 +205,9 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params)
     camdev_capture_start(recorder->camdev[1]);
 
     // set callback
-    micdev_set_callback(recorder->micdev[0], micdev0_capture_callback_proc, recorder);
-    camdev_set_callback(recorder->camdev[0], camdev0_capture_callback_proc, recorder);
-    camdev_set_callback(recorder->camdev[1], camdev1_capture_callback_proc, recorder);
-
-    // get actual frame rate
-    while (recorder->camdev[0] && recorder->camdev[0]->act_frate == 0) usleep(10*1000);
-    while (recorder->camdev[1] && recorder->camdev[1]->act_frate == 0) usleep(10*1000);
+    micdev_set_callback(recorder->micdev[0], (void*)micdev0_capture_callback_proc, recorder);
+    camdev_set_callback(recorder->camdev[0], (void*)camdev0_capture_callback_proc, recorder);
+    camdev_set_callback(recorder->camdev[1], (void*)camdev1_capture_callback_proc, recorder);
 
     return recorder;
 }
@@ -272,8 +268,7 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
 
     recorder->camdev[camidx] = camdev_init(dev_name, sub_src, w, h, frate);
     camdev_capture_start(recorder->camdev[camidx]);
-    camdev_set_callback(recorder->camdev[camidx], camidx ? camdev1_capture_callback_proc : camdev0_capture_callback_proc, recorder);
-    while (recorder->camdev[camidx] && recorder->camdev[camidx]->act_frate == 0) usleep(10*1000);
+    camdev_set_callback(recorder->camdev[camidx], (void*)(camidx ? camdev1_capture_callback_proc : camdev0_capture_callback_proc), recorder);
 }
 
 void ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win)
@@ -308,7 +303,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
 {
     FFRECORDER *recorder  = (FFRECORDER*)ctxt;
     int         vidsrc    = 0;
-    CAMDEV     *camdev    = NULL;
+    void       *camdev    = NULL;
     int         abitrate  = 0;
     int         achlayout = 0;
     int         asamprate = 0;
@@ -366,10 +361,10 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.in_audio_channel_layout = AV_CH_LAYOUT_STEREO;
     encoder_params.in_audio_sample_fmt     = AV_SAMPLE_FMT_S16;
     encoder_params.in_audio_sample_rate    = recorder->params.mic_sample_rate;
-    encoder_params.in_video_width          = camdev ? camdev->cam_w : 0;
-    encoder_params.in_video_height         = camdev ? camdev->cam_h : 0;
-    encoder_params.in_video_pixfmt         = camdev ? v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev->cam_pixfmt) : 0;
-    encoder_params.in_video_frame_rate     = camdev ? camdev->act_frate : 0;
+    encoder_params.in_video_width          = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_WIDTH );
+    encoder_params.in_video_height         = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_HEIGHT);
+    encoder_params.in_video_pixfmt         = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT));
+    encoder_params.in_video_frame_rate     = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE );
     encoder_params.out_filename            = filename;
     encoder_params.out_audio_bitrate       = abitrate;
     encoder_params.out_audio_channel_layout= achlayout;

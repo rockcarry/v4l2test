@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    CAMDEV *cam = NULL;
+    void   *cam = NULL;
     char    dev[32] = "/dev/video0";
     int     sub     = 0;
     int     w       = 640;

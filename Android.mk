@@ -90,7 +90,8 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 LOCAL_C_INCLUDES := external/tinyalsa/include
 
 LOCAL_SRC_FILES := \
-    micdev.cpp \
+    micdev_android.cpp \
+    micdev_tinyalsa.cpp \
     camdev.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \
