@@ -12,9 +12,8 @@ recordertest - capture audio & video from mic & camera, preview camera on screen
 
 After code stable, I will implement jni and test apks. It aimed to provide api for audio & video recording and live streaming on android platform, with high stability and performace.
 
-
-How does it coming
-==================
+Why did I create it
+===================
 
 At my work, I am maintaining codes of android DVR app for in-car products, which request high stability and long time work, which using the android standard camera and recorder api. I meet many bugs and issues, on android camera hal, camera api, recorder api.
 
