@@ -31,7 +31,11 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 {
     // micdev input params
     44100,                      // mic_sample_rate
+#ifdef USE_MICDEV_ANDROID
+    1,                          // mic_channel_num
+#else
     2,                          // mic_channel_num
+#endif
 
     // camdev input params
     (char*)"/dev/video0",       // cam_dev_name_0
@@ -43,8 +47,8 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     // camdev input params
     (char*)"/dev/video1",       // cam_dev_name_1
     0,                          // cam_sub_src_1
-    1280,                       // cam_frame_width_1
-    720,                        // cam_frame_height_1
+    640,                        // cam_frame_width_1
+    480,                        // cam_frame_height_1
     25,                         // cam_frame_rate_1
 
     // ffencoder output
@@ -180,7 +184,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
     recorder->video_source[1] = 1;
     recorder->video_source[2] =-1;
 
-    recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, extra);
+//  recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, extra);
     if (!recorder->micdev[0]) {
         printf("failed to init micdev !\n");
     }
