@@ -130,7 +130,7 @@ int camdev1_capture_callback_proc(void *r, void *data[8], int linesize[8])
 }
 
 // º¯ÊýÊµÏÖ
-void *ffrecorder_init(FFRECORDER_PARAMS *params)
+void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
 {
     FFRECORDER *recorder = (FFRECORDER*)malloc(sizeof(FFRECORDER));
     if (recorder) memset(recorder, 0, sizeof(FFRECORDER));
@@ -180,7 +180,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params)
     recorder->video_source[1] = 1;
     recorder->video_source[2] =-1;
 
-    recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, NULL);
+    recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, extra);
     if (!recorder->micdev[0]) {
         printf("failed to init micdev !\n");
     }

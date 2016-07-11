@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     sp<ANativeWindow> win = surface;
 
     // init camdev
-    recorder = ffrecorder_init(NULL);
+    recorder = ffrecorder_init(NULL, NULL);
 
     // startpreview
     ffrecorder_preview_window(recorder, 0, win);

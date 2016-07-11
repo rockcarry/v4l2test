@@ -61,7 +61,7 @@ typedef struct
 } FFRECORDER_PARAMS;
 
 // º¯Êý¶¨Òå
-void *ffrecorder_init(FFRECORDER_PARAMS *params);
+void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra);
 void  ffrecorder_free(void *ctxt);
 void  ffrecorder_reset_camdev  (void *ctxt, int camidx, int w, int h, int frate);
 void  ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win);
