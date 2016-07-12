@@ -57,7 +57,8 @@ static void* micdev_capture_thread_proc(void *param)
             memset(mic->buffer, 0, mic->buflen);
         }
         else {
-            nread = mic->jni_env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read, mic->read_buf, 0, mic->buflen);
+            nread = mic->jni_env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
+                        mic->read_buf, 0, mic->buflen / (2 * mic->channels));
             mic->jni_env->GetByteArrayRegion(mic->read_buf, 0, nread, (jbyte*)mic->buffer);
         }
 
@@ -77,7 +78,7 @@ static void* micdev_capture_thread_proc(void *param)
 // 函数实现
 void* micdev_android_init(int samprate, int channels, void *extra)
 {
-    int   chcfg = channels ? CHANNEL_CONFIGURATION_STEREO : CHANNEL_CONFIGURATION_MONO;
+    int   chcfg = channels == 2 ? CHANNEL_CONFIGURATION_STEREO : CHANNEL_CONFIGURATION_MONO;
     MICDEV *mic = (MICDEV*)malloc(sizeof(MICDEV));
     if (!mic) {
         ALOGE("failed to allocate micdev context !\n");
