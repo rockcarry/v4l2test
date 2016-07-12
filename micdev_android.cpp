@@ -38,7 +38,7 @@ typedef struct {
     jmethodID   audio_record_stop;
     jmethodID   audio_record_release;
     jobject     audio_record_obj;
-    jbyteArray  read_buf;
+    jbyteArray  audio_buf;
 } MICDEV;
 
 // 内部函数实现
@@ -58,8 +58,7 @@ static void* micdev_capture_thread_proc(void *param)
         }
         else {
             nread = mic->jni_env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
-                        mic->read_buf, 0, mic->buflen / (2 * mic->channels));
-            mic->jni_env->GetByteArrayRegion(mic->read_buf, 0, nread, (jbyte*)mic->buffer);
+                        mic->audio_buf, 0, mic->buflen / (2 * mic->channels));
         }
 
         if (mic->callback) {
@@ -103,18 +102,13 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     mic->buflen = mic->jni_env->CallStaticIntMethod(mic->audio_record_class,
         mic->audio_record_getMinBufferSize, samprate, chcfg, ENCODING_PCM_16BIT);
 
-    // allocate buffer
-    mic->buffer = (uint8_t*)malloc(mic->buflen);
-    if (!mic->buffer) {
-        ALOGE("unable to allocate %d bytes buffer !\n", mic->buflen);
-    }
-
     // new AudioRecord
     mic->audio_record_obj = mic->jni_env->NewObject(mic->audio_record_class, mic->audio_record_constructor,
         AUDIO_SOURCE_MIC, samprate, chcfg, ENCODING_PCM_16BIT, mic->buflen * 2);
 
     // new buffer
-    mic->read_buf = mic->jni_env->NewByteArray(mic->buflen);
+    mic->audio_buf = mic->jni_env->NewByteArray(mic->buflen);
+    mic->buffer    = (uint8_t*)mic->jni_env->GetByteArrayElements(mic->audio_buf, 0);
 
     // create thread for micdev
     pthread_create(&mic->thread_id, NULL, micdev_capture_thread_proc, mic);
@@ -135,12 +129,12 @@ void micdev_android_close(void *ctxt)
     mic->jni_env->CallVoidMethod(mic->audio_record_obj, mic->audio_record_release);
 
     // delete local reference
-    mic->jni_env->DeleteLocalRef(mic->read_buf);
+    mic->jni_env->ReleaseByteArrayElements(mic->audio_buf, (jbyte*)mic->buffer, 0);
+    mic->jni_env->DeleteLocalRef(mic->audio_buf);
     mic->jni_env->DeleteLocalRef(mic->audio_record_obj);
     mic->jni_env->DeleteLocalRef(mic->audio_record_class);
 
     // free
-    free(mic->buffer);
     free(mic);
 }
 
