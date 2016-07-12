@@ -85,10 +85,11 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     }
     else memset(mic, 0, sizeof(MICDEV));
 
-    mic->samprate = samprate;
-    mic->channels = channels;
-    mic->extra    = extra;
-    mic->jni_env  = (JNIEnv*)extra;
+    mic->thread_state = MICDEV_TS_PAUSE;
+    mic->samprate     = samprate;
+    mic->channels     = channels;
+    mic->extra        = extra;
+    mic->jni_env      = (JNIEnv*)extra;
     mic->audio_record_class            = mic->jni_env->FindClass("android/media/AudioRecord");
     mic->audio_record_constructor      = mic->jni_env->GetMethodID(mic->audio_record_class, "<init>", "(IIIII)V");
     mic->audio_record_getMinBufferSize = mic->jni_env->GetStaticMethodID(mic->audio_record_class, "getMinBufferSize", "(III)I");
@@ -147,11 +148,11 @@ void micdev_android_start_capture(void *ctxt)
     MICDEV *mic = (MICDEV*)ctxt;
     if (!mic) return;
 
-    // start capture
-    mic->thread_state &= ~MICDEV_TS_PAUSE;
-
     // startRecording
     mic->jni_env->CallVoidMethod(mic->audio_record_obj, mic->audio_record_startRecording);
+
+    // start capture
+    mic->thread_state &= ~MICDEV_TS_PAUSE;
 }
 
 void micdev_android_stop_capture(void *ctxt)

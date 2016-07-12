@@ -69,9 +69,10 @@ void* micdev_tinyalsa_init(int samprate, int channels, void *extra)
     }
     else memset(mic, 0, sizeof(MICDEV));
 
-    mic->samprate = samprate;
-    mic->channels = channels;
-    mic->extra    = extra;
+    mic->thread_state = MICDEV_TS_PAUSE;
+    mic->samprate     = samprate;
+    mic->channels     = channels;
+    mic->extra        = extra;
     mic->config.channels          = channels;
     mic->config.rate              = samprate;
     mic->config.period_size       = DEF_PCM_BUF_SIZE;
