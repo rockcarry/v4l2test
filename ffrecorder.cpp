@@ -184,7 +184,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
     recorder->video_source[1] = 1;
     recorder->video_source[2] =-1;
 
-//  recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, extra);
+    recorder->micdev[0] = micdev_init(params->mic_sample_rate, params->mic_channel_num, extra);
     if (!recorder->micdev[0]) {
         printf("failed to init micdev !\n");
     }

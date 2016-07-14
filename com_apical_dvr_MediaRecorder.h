@@ -7,6 +7,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+extern JavaVM* g_jvm;
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*);
+JNIEXPORT JNIEnv* get_jni_env(void);
+
 /*
  * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeInit
