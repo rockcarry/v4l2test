@@ -75,6 +75,8 @@ static void* micdev_capture_thread_proc(void *param)
         usleep(10*1000);
     }
 
+    // need call DetachCurrentThread
+    g_jvm->DetachCurrentThread();
     return NULL;
 }
 
