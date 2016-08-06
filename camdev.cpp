@@ -294,13 +294,10 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
 // 函数实现
 void* camdev_init(const char *dev, int sub, int w, int h, int frate)
 {
-    CAMDEV *cam = (CAMDEV*)malloc(sizeof(CAMDEV));
+    CAMDEV *cam = (CAMDEV*)calloc(1, sizeof(CAMDEV));
     if (!cam) {
         return NULL;
     }
-
-    // init context
-    memset(cam, 0, sizeof(CAMDEV));
 
     // open camera device
     cam->fd = open(dev, O_RDWR | O_NONBLOCK);

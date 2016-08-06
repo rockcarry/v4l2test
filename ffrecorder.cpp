@@ -136,9 +136,10 @@ int camdev1_capture_callback_proc(void *r, void *data[8], int linesize[8])
 // º¯ÊýÊµÏÖ
 void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
 {
-    FFRECORDER *recorder = (FFRECORDER*)malloc(sizeof(FFRECORDER));
-    if (recorder) memset(recorder, 0, sizeof(FFRECORDER));
-    else return NULL;
+    FFRECORDER *recorder = (FFRECORDER*)calloc(1, sizeof(FFRECORDER));
+    if (!recorder) {
+        return NULL;
+    }
 
     // using default params if not set
     if (!params                      ) params                       = &DEF_FFRECORDER_PARAMS;

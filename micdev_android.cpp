@@ -85,12 +85,11 @@ void* micdev_android_init(int samprate, int channels, void *extra)
 {
     JNIEnv *env = get_jni_env();
     int   chcfg = channels == 2 ? CHANNEL_CONFIGURATION_STEREO : CHANNEL_CONFIGURATION_MONO;
-    MICDEV *mic = (MICDEV*)malloc(sizeof(MICDEV));
+    MICDEV *mic = (MICDEV*)calloc(1, sizeof(MICDEV));
     if (!mic) {
         ALOGE("failed to allocate micdev context !\n");
         return NULL;
     }
-    else memset(mic, 0, sizeof(MICDEV));
 
     mic->thread_state = MICDEV_TS_PAUSE;
     mic->samprate     = samprate;

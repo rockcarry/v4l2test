@@ -420,14 +420,12 @@ static void open_audio(FFENCODER *encoder)
         exit(1);
     }
 
-    encoder->aframes = (AVFrame*)malloc(sizeof(AVFrame) * encoder->params.audio_buffer_number);
+    encoder->aframes = (AVFrame*)calloc(encoder->params.audio_buffer_number, sizeof(AVFrame));
     if (!encoder->aframes) {
         printf("failed to allocate memory for aframes !\n");
         exit(1);
     }
-    else {
-        memset(encoder->aframes, 0, sizeof(AVFrame) * encoder->params.audio_buffer_number);
-    }
+
     for (i=0; i<encoder->params.audio_buffer_number; i++) {
         alloc_audio_frame(&encoder->aframes[i],
             c->sample_fmt,
@@ -494,14 +492,12 @@ static void open_video(FFENCODER *encoder)
         exit(1);
     }
 
-    encoder->vframes = (AVFrame*)malloc(sizeof(AVFrame) * encoder->params.video_buffer_number);
+    encoder->vframes = (AVFrame*)calloc(encoder->params.video_buffer_number, sizeof(AVFrame));
     if (!encoder->vframes) {
         printf("failed to allocate memory for vframes !\n");
         exit(1);
     }
-    else {
-        memset(encoder->vframes, 0, sizeof(AVFrame) * encoder->params.video_buffer_number);
-    }
+
     for (i=0; i<encoder->params.video_buffer_number; i++) {
         alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
     }
@@ -565,9 +561,10 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     int ret;
 
     // allocate context for ffencoder
-    FFENCODER *encoder = (FFENCODER*)malloc(sizeof(FFENCODER));
-    if (encoder) memset(encoder, 0, sizeof(FFENCODER));
-    else return NULL;
+    FFENCODER *encoder = (FFENCODER*)calloc(1, sizeof(FFENCODER));
+    if (!encoder) {
+        return NULL;
+    }
 
     // using default params if not set
     if (!params                          ) params                          = &DEF_FFENCODER_PARAMS;

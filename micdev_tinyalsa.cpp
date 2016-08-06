@@ -62,12 +62,11 @@ static void* micdev_capture_thread_proc(void *param)
 // 函数实现
 void* micdev_tinyalsa_init(int samprate, int channels, void *extra)
 {
-    MICDEV *mic = (MICDEV*)malloc(sizeof(MICDEV));
+    MICDEV *mic = (MICDEV*)calloc(1, sizeof(MICDEV));
     if (!mic) {
         ALOGE("failed to allocate micdev context !\n");
         return NULL;
     }
-    else memset(mic, 0, sizeof(MICDEV));
 
     mic->thread_state = MICDEV_TS_PAUSE;
     mic->samprate     = samprate;
@@ -88,7 +87,7 @@ void* micdev_tinyalsa_init(int samprate, int channels, void *extra)
     }
 
     mic->buflen = pcm_frames_to_bytes(mic->pcm, pcm_get_buffer_size(mic->pcm));
-    mic->buffer = (uint8_t*)malloc(mic->buflen);
+    mic->buffer = (uint8_t*)calloc(mic->buflen, sizeof(uint8_t));
     if (!mic->buffer) {
         ALOGE("unable to allocate %d bytes buffer !\n", mic->buflen);
         goto failed;
