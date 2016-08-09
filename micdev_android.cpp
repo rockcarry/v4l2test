@@ -29,15 +29,12 @@
 // micdev context
 typedef struct {
     MICDEV_COMMON
-    jclass      audio_record_class;
-    jmethodID   audio_record_constructor;
-    jmethodID   audio_record_getMinBufferSize;
     jmethodID   audio_record_read;
     jmethodID   audio_record_startRecording;
     jmethodID   audio_record_stop;
     jmethodID   audio_record_release;
     jobject     audio_record_obj;
-    jbyteArray  audio_buf;
+    jbyteArray  audio_buffer;
 } MICDEV;
 
 extern "C" JavaVM* g_jvm;
@@ -61,8 +58,8 @@ static void* micdev_capture_thread_proc(void *param)
         }
         else {
             nread = env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
-                        mic->audio_buf, 0, mic->buflen / (2 * mic->channels));
-            ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
+                        mic->audio_buffer, 0, mic->buflen);
+//          ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
         }
 
         if (mic->callback) {
@@ -95,25 +92,35 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     mic->samprate     = samprate;
     mic->channels     = channels;
     mic->extra        = extra;
-    mic->audio_record_class            = env->FindClass("android/media/AudioRecord");
-    mic->audio_record_constructor      = env->GetMethodID(mic->audio_record_class, "<init>", "(IIIII)V");
-    mic->audio_record_getMinBufferSize = env->GetStaticMethodID(mic->audio_record_class, "getMinBufferSize", "(III)I");
-    mic->audio_record_read             = env->GetMethodID(mic->audio_record_class, "read", "([BII)I");
-    mic->audio_record_startRecording   = env->GetMethodID(mic->audio_record_class, "startRecording", "()V");
-    mic->audio_record_stop             = env->GetMethodID(mic->audio_record_class, "stop", "()V");
-    mic->audio_record_release          = env->GetMethodID(mic->audio_record_class, "release", "()V");
+
+    jclass    local_audio_record_class      = (jclass)env->FindClass("android/media/AudioRecord");
+    jmethodID audio_record_constructor      = (jmethodID)env->GetMethodID(local_audio_record_class, "<init>", "(IIIII)V");
+    jmethodID audio_record_getMinBufferSize = env->GetStaticMethodID(local_audio_record_class, "getMinBufferSize", "(III)I");
+    mic->audio_record_read                  = env->GetMethodID(local_audio_record_class, "read", "([BII)I");
+    mic->audio_record_startRecording        = env->GetMethodID(local_audio_record_class, "startRecording", "()V");
+    mic->audio_record_stop                  = env->GetMethodID(local_audio_record_class, "stop", "()V");
+    mic->audio_record_release               = env->GetMethodID(local_audio_record_class, "release", "()V");
 
     // AudioRecord.getMinBufferSize
-    mic->buflen = env->CallStaticIntMethod(mic->audio_record_class,
-        mic->audio_record_getMinBufferSize, samprate, chcfg, ENCODING_PCM_16BIT);
+    mic->buflen = env->CallStaticIntMethod(local_audio_record_class,
+        audio_record_getMinBufferSize, samprate, chcfg, ENCODING_PCM_16BIT);
 
     // new AudioRecord
-    mic->audio_record_obj = env->NewObject(mic->audio_record_class, mic->audio_record_constructor,
+    jobject local_audio_record_obj = env->NewObject(local_audio_record_class, audio_record_constructor,
         AUDIO_SOURCE_MIC, samprate, chcfg, ENCODING_PCM_16BIT, mic->buflen * 2);
 
     // new buffer
-    mic->audio_buf = env->NewByteArray(mic->buflen);
-    mic->buffer    = (uint8_t*)env->GetByteArrayElements(mic->audio_buf, 0);
+    jbyteArray local_audio_buffer = env->NewByteArray(mic->buflen);
+    mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
+
+    // create global ref
+    mic->audio_record_obj = env->NewGlobalRef(local_audio_record_obj);
+    mic->audio_buffer     = (jbyteArray)env->NewGlobalRef(local_audio_buffer);
+
+    // delete local ref
+    env->DeleteLocalRef(local_audio_record_class);
+    env->DeleteLocalRef(local_audio_record_obj  );
+    env->DeleteLocalRef(local_audio_buffer      );
 
     // create thread for micdev
     pthread_create(&mic->thread_id, NULL, micdev_capture_thread_proc, mic);
@@ -135,10 +142,11 @@ void micdev_android_close(void *ctxt)
     env->CallVoidMethod(mic->audio_record_obj, mic->audio_record_release);
 
     // delete local reference
-    env->ReleaseByteArrayElements(mic->audio_buf, (jbyte*)mic->buffer, 0);
-    env->DeleteLocalRef(mic->audio_buf);
-    env->DeleteLocalRef(mic->audio_record_obj);
-    env->DeleteLocalRef(mic->audio_record_class);
+    env->ReleaseByteArrayElements(mic->audio_buffer, (jbyte*)mic->buffer, 0);
+
+    // delete global ref
+    env->DeleteGlobalRef(mic->audio_record_obj);
+    env->DeleteGlobalRef(mic->audio_buffer    );
 
     // free
     free(mic);
