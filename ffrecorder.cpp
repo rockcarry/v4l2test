@@ -45,7 +45,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     25,                         // cam_frame_rate_0
 
     // camdev input params
-    (char*)"/dev/video1",       // cam_dev_name_1
+    (char*)"/dev/video2",       // cam_dev_name_1
     0,                          // cam_sub_src_1
     640,                        // cam_frame_width_1
     480,                        // cam_frame_height_1
