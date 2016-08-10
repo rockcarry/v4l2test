@@ -363,7 +363,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
 
     // switch to a new ffencoder for recording
     FFENCODER_PARAMS encoder_params;
-    encoder_params.in_audio_channel_layout = AV_CH_LAYOUT_STEREO;
+    encoder_params.in_audio_channel_layout = recorder->params.mic_channel_num == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
     encoder_params.in_audio_sample_fmt     = AV_SAMPLE_FMT_S16;
     encoder_params.in_audio_sample_rate    = recorder->params.mic_sample_rate;
     encoder_params.in_video_width          = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_WIDTH );
