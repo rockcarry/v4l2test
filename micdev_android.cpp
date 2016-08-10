@@ -47,6 +47,8 @@ static void* micdev_capture_thread_proc(void *param)
     MICDEV *mic = (MICDEV*)param;
     int   nread = 0;
 
+    mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
+
     while (!(mic->thread_state & MICDEV_TS_EXIT)) {
         if (mic->thread_state & MICDEV_TS_PAUSE) {
             usleep(10*1000);
@@ -71,6 +73,8 @@ static void* micdev_capture_thread_proc(void *param)
         // sleep to release cpu
         usleep(10*1000);
     }
+
+    mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
 
     // need call DetachCurrentThread
     g_jvm->DetachCurrentThread();
@@ -102,16 +106,16 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     mic->audio_record_release               = env->GetMethodID(local_audio_record_class, "release", "()V");
 
     // AudioRecord.getMinBufferSize
-    mic->buflen = env->CallStaticIntMethod(local_audio_record_class,
+    mic->buflen = 2 * env->CallStaticIntMethod(local_audio_record_class,
         audio_record_getMinBufferSize, samprate, chcfg, ENCODING_PCM_16BIT);
 
     // new AudioRecord
     jobject local_audio_record_obj = env->NewObject(local_audio_record_class, audio_record_constructor,
-        AUDIO_SOURCE_MIC, samprate, chcfg, ENCODING_PCM_16BIT, mic->buflen * 2);
+        AUDIO_SOURCE_MIC, samprate, chcfg, ENCODING_PCM_16BIT, mic->buflen);
 
     // new buffer
     jbyteArray local_audio_buffer = env->NewByteArray(mic->buflen);
-    mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
+//  mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
 
     // create global ref
     mic->audio_record_obj = env->NewGlobalRef(local_audio_record_obj);
@@ -142,7 +146,7 @@ void micdev_android_close(void *ctxt)
     env->CallVoidMethod(mic->audio_record_obj, mic->audio_record_release);
 
     // delete local reference
-    env->ReleaseByteArrayElements(mic->audio_buffer, (jbyte*)mic->buffer, 0);
+//  env->ReleaseByteArrayElements(mic->audio_buffer, (jbyte*)mic->buffer, 0);
 
     // delete global ref
     env->DeleteGlobalRef(mic->audio_record_obj);
