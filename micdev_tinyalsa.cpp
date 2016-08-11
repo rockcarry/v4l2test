@@ -34,16 +34,15 @@ static void* micdev_capture_thread_proc(void *param)
             continue;
         }
 
+        // read data from pcm
+#if 0
+        pcm_read(mic->pcm, mic->buffer, mic->buflen);
+#else
+        pcm_read_ex(mic->pcm, mic->buffer, mic->buflen);
+#endif
+
         if (mic->mute) {
             memset(mic->buffer, 0, mic->buflen);
-        }
-        else {
-            // read data from pcm
-#if 0
-            pcm_read(mic->pcm, mic->buffer, mic->buflen);
-#else
-            pcm_read_ex(mic->pcm, mic->buffer, mic->buflen);
-#endif
         }
 
         if (mic->callback) {

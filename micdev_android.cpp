@@ -55,13 +55,12 @@ static void* micdev_capture_thread_proc(void *param)
             continue;
         }
 
+        nread = env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
+                    mic->audio_buffer, 0, mic->buflen);
+//      ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
+
         if (mic->mute) {
             memset(mic->buffer, 0, mic->buflen);
-        }
-        else {
-            nread = env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
-                        mic->audio_buffer, 0, mic->buflen);
-//          ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
         }
 
         if (mic->callback) {
