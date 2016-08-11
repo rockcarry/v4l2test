@@ -238,6 +238,20 @@ void ffrecorder_free(void *ctxt)
     free(recorder);
 }
 
+int ffrecorder_get_mic_mute(void *ctxt, int micidx)
+{
+    FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    micidx %= MAX_MICDEV_NUM;
+    return micdev_get_mute(recorder->micdev[micidx]);
+}
+
+void ffrecorder_set_mic_mute(void *ctxt, int micidx, int mute)
+{
+    FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    micidx %= MAX_MICDEV_NUM;
+    micdev_set_mute(recorder->micdev[micidx], mute);
+}
+
 void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;

@@ -71,6 +71,28 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeFree
 
 /*
  * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeGetMicMute
+ * Signature: (JI)I
+ */
+JNIEXPORT jint JNICALL Java_com_apical_dvr_MediaRecorder_nativeGetMicMute
+  (JNIEnv *env, jclass clazz, jlong ctxt, jint micidx)
+{
+    return ffrecorder_get_mic_mute((void*)ctxt, micidx);
+}
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeSetMicMute
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetMicMute
+  (JNIEnv *env, jclass clazz, jlong ctxt, jint micidx, jint mute)
+{
+    ffrecorder_set_mic_mute((void*)ctxt, micidx, mute);
+}
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeResetCamera
  * Signature: (JIIII)V
  */

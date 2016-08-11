@@ -63,6 +63,8 @@ typedef struct
 // º¯Êý¶¨Òå
 void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra);
 void  ffrecorder_free(void *ctxt);
+int   ffrecorder_get_mic_mute  (void *ctxt, int micidx);
+void  ffrecorder_set_mic_mute  (void *ctxt, int micidx, int mute);
 void  ffrecorder_reset_camdev  (void *ctxt, int camidx, int w, int h, int frate);
 void  ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win);
 void  ffrecorder_preview_target(void *ctxt, int camidx, const sp<IGraphicBufferProducer>& gbp);

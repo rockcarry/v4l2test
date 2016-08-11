@@ -5,6 +5,8 @@ public class MediaRecorder {
     public static native long nativeInit();
     public static native void nativeFree(long ctxt);
 
+    public static native int  nativeGetMicMute (long ctxt, int micidx);
+    public static native void nativeSetMicMute (long ctxt, int micidx, int mute);
     public static native void nativeResetCamera(long ctxt, int camidx, int w, int h, int frate);
 
     public static native void nativeSetPreviewWindow(long ctxt, int camidx, Object win);

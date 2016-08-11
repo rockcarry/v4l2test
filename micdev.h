@@ -29,12 +29,16 @@
 #define micdev_close         micdev_android_close
 #define micdev_start_capture micdev_android_start_capture
 #define micdev_stop_capture  micdev_android_stop_capture
+#define micdev_get_mute      micdev_android_get_mute
+#define micdev_set_mute      micdev_android_set_mute
 #define micdev_set_callback  micdev_android_set_callback
 #else
 #define micdev_init          micdev_tinyalsa_init
 #define micdev_close         micdev_tinyalsa_close
 #define micdev_start_capture micdev_tinyalsa_start_capture
 #define micdev_stop_capture  micdev_tinyalsa_stop_capture
+#define micdev_get_mute      micdev_tinyalsa_get_mute
+#define micdev_set_mute      micdev_tinyalsa_set_mute
 #define micdev_set_callback  micdev_tinyalsa_set_callback
 #endif
 

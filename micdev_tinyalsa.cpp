@@ -138,6 +138,13 @@ void micdev_tinyalsa_stop_capture(void *ctxt)
     mic->thread_state |= MICDEV_TS_PAUSE;
 }
 
+int micdev_tinyalsa_get_mute(void *ctxt)
+{
+    MICDEV *mic = (MICDEV*)ctxt;
+    if (!mic) return 1;
+    return mic->mute;
+}
+
 void micdev_tinyalsa_set_mute(void *ctxt, int mute)
 {
     MICDEV *mic = (MICDEV*)ctxt;

@@ -182,6 +182,13 @@ void micdev_android_stop_capture(void *ctxt)
     env->CallVoidMethod(mic->audio_record_obj, mic->audio_record_stop);
 }
 
+int micdev_android_get_mute(void *ctxt)
+{
+    MICDEV *mic = (MICDEV*)ctxt;
+    if (!mic) return 1;
+    return mic->mute;
+}
+
 void micdev_android_set_mute(void *ctxt, int mute)
 {
     MICDEV *mic = (MICDEV*)ctxt;

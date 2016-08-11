@@ -10,6 +10,7 @@ void* micdev_tinyalsa_init (int samprate, int channels, void *extra);
 void  micdev_tinyalsa_close(void *ctxt);
 void  micdev_tinyalsa_start_capture(void *ctxt);
 void  micdev_tinyalsa_stop_capture (void *ctxt);
+int   micdev_tinyalsa_get_mute     (void *ctxt);
 void  micdev_tinyalsa_set_mute     (void *ctxt, int mute);
 void  micdev_tinyalsa_set_callback (void *ctxt, void *callback, void *recorder);
 
