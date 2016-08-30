@@ -62,6 +62,7 @@ int main(void)
         ffencoder_video(encoder, vdata, linesize);
     }
 
+    ffencoder_jpeg(encoder, "/sdcard/test.jpg", vdata, linesize);
     ffencoder_free(encoder);
     printf("encode done\n");
     return 0;

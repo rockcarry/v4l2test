@@ -40,6 +40,7 @@ void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
 int   ffencoder_audio(void *ctxt, void *data[8], int nbsample   );
 int   ffencoder_video(void *ctxt, void *data[8], int linesize[8]);
+int   ffencoder_jpeg (void *ctxt, char *file, void *data[8], int linesize[8]);
 
 #ifdef __cplusplus
 }
