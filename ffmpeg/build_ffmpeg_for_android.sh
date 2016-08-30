@@ -75,7 +75,9 @@ cd ffmpeg
 --disable-everything \
 --enable-encoder=libx264 \
 --enable-encoder=aac \
+--enable-encoder=mjpeg \
 --enable-muxer=mp4 \
+--enable-muxer=mjpeg \
 --enable-protocol=file \
 --enable-protocol=rtmp \
 --disable-swscale-alpha \
