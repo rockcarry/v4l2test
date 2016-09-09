@@ -76,6 +76,7 @@ cd ffmpeg
 --enable-encoder=libx264 \
 --enable-encoder=aac \
 --enable-encoder=mjpeg \
+--enable-muxer=flv \
 --enable-muxer=mp4 \
 --enable-muxer=mjpeg \
 --enable-protocol=file \
