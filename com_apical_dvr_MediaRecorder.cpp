@@ -203,7 +203,20 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetAudioSource
  * Signature: (JII)V
  */
 JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetVideoSource
-  (JNIEnv *env, jclass, jlong ctxt, jint encidx, jint source)
+  (JNIEnv *env, jclass clazz, jlong ctxt, jint encidx, jint source)
 {
     ffrecorder_record_video_source((void*)ctxt, encidx, source);
+}
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeTakePhoto
+ * Signature: (JILjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeTakePhoto
+  (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jstring filename)
+{
+    const char *str = env->GetStringUTFChars(filename, NULL);
+    ffrecorder_take_photo((void*)ctxt, camidx, (char*)str);
+    env->ReleaseStringUTFChars(filename, str);
 }

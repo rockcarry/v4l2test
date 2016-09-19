@@ -92,13 +92,22 @@ typedef struct
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
     pthread_mutex_t    mutex;
-
-    struct SwsContext *jpg_sws_ctx;
-    AVPixelFormat      jpg_pix_fmt;
-    AVFrame            jpg_picture;
-    char               jpg_file[PATH_MAX];
-    pthread_t          jencode_thread_id;
 } FFENCODER;
+
+typedef struct
+{
+    struct SwsContext *sws_ctx;
+    AVPixelFormat      ifmt;
+    int                iw;
+    int                ih;
+    AVPixelFormat      ofmt;
+    int                ow;
+    int                oh;
+    int                scale;
+    AVFrame            picture;
+    char              *file;
+    pthread_t          thread_id;
+} JPGENCODER;
 
 // 内部全局变量定义
 static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
@@ -121,8 +130,6 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     320,                        // out_video_width
     240,                        // out_video_height
     20,                         // out_video_frame_rate
-    320,                        // out_jpeg_width
-    240,                        // out_jpeg_height
 
     // other params
     0,                          // start_apts
@@ -267,7 +274,7 @@ static void* video_encode_thread_proc(void *param)
 
 static void* jpeg_encode_thread_proc(void *param)
 {
-    FFENCODER       *encoder    = (FFENCODER*)param;
+    JPGENCODER      *encoder    = (JPGENCODER*)param;
     AVFormatContext *fmt_ctxt   = NULL;
     AVOutputFormat  *out_fmt    = NULL;
     AVStream        *stream     = NULL;
@@ -284,8 +291,8 @@ static void* jpeg_encode_thread_proc(void *param)
     fmt_ctxt = avformat_alloc_context();
     out_fmt  = av_guess_format("mjpeg", NULL, NULL);
     fmt_ctxt->oformat = out_fmt;
-    if (avio_open(&fmt_ctxt->pb, encoder->jpg_file, AVIO_FLAG_READ_WRITE) < 0) {
-        printf("failed to open output file: %s !\n", encoder->jpg_file);
+    if (avio_open(&fmt_ctxt->pb, encoder->file, AVIO_FLAG_READ_WRITE) < 0) {
+        printf("failed to open output file: %s !\n", encoder->file);
         goto done;
     }
 
@@ -299,8 +306,8 @@ static void* jpeg_encode_thread_proc(void *param)
     codec_ctxt->codec_id      = out_fmt->video_codec;
     codec_ctxt->codec_type    = AVMEDIA_TYPE_VIDEO;
     codec_ctxt->pix_fmt       = AV_PIX_FMT_YUVJ420P;
-    codec_ctxt->width         = encoder->params.out_jpeg_width;
-    codec_ctxt->height        = encoder->params.out_jpeg_height;
+    codec_ctxt->width         = encoder->ow;
+    codec_ctxt->height        = encoder->oh;
     codec_ctxt->time_base.num = 1;
     codec_ctxt->time_base.den = 25;
 
@@ -315,7 +322,7 @@ static void* jpeg_encode_thread_proc(void *param)
         goto done;
     }
 
-    avcodec_encode_video2(codec_ctxt, &packet, &encoder->jpg_picture, &got);
+    avcodec_encode_video2(codec_ctxt, &packet, &encoder->picture, &got);
     if (got) {
         ret = avformat_write_header(fmt_ctxt, NULL);
         if (ret < 0) {
@@ -332,7 +339,7 @@ done:
     if (fmt_ctxt    ) avformat_free_context(fmt_ctxt);
     av_packet_unref(&packet );
 
-    encoder->jpg_file[0] = '\0';
+    encoder->file = NULL;
     return NULL;
 }
 
@@ -582,23 +589,6 @@ static void open_video(FFENCODER *encoder)
         alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
     }
 
-    encoder->jpg_pix_fmt = AV_PIX_FMT_YUV420P;
-    encoder->jpg_sws_ctx = sws_getContext(
-        encoder->params.in_video_width,
-        encoder->params.in_video_height,
-        (AVPixelFormat)encoder->params.in_video_pixfmt,
-        encoder->params.out_jpeg_width,
-        encoder->params.out_jpeg_height,
-        encoder->jpg_pix_fmt,
-        encoder->params.scale_flags,
-        NULL, NULL, NULL);
-    if (!encoder->jpg_sws_ctx) {
-        printf("could not initialize the conversion context jpg\n");
-        exit(1);
-    }
-    // alloc picture
-    alloc_picture(&encoder->jpg_picture, encoder->jpg_pix_fmt, encoder->params.out_jpeg_width, encoder->params.out_jpeg_height);
-
     sem_init(&encoder->vsemr, 0, 0                                  );
     sem_init(&encoder->vsemw, 0, encoder->params.video_buffer_number);
 
@@ -623,9 +613,6 @@ static void close_astream(FFENCODER *encoder)
     free(encoder->aframes);
     //-- for audio frames
 
-    // free jpeg picture frame
-    av_frame_unref(&encoder->jpg_picture);
-
     // free temp audio frame
     av_frame_unref(&encoder->aframetmp);
 
@@ -639,7 +626,6 @@ static void close_vstream(FFENCODER *encoder)
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
     pthread_join(encoder->vencode_thread_id, NULL);
-    pthread_join(encoder->jencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);
     sem_destroy(&encoder->vsemw);
@@ -652,8 +638,7 @@ static void close_vstream(FFENCODER *encoder)
     //-- for video frames
 
     avcodec_close(encoder->vstream->codec);
-    sws_freeContext(encoder->sws_ctx     );
-    sws_freeContext(encoder->jpg_sws_ctx );
+    sws_freeContext(encoder->sws_ctx);
 }
 
 
@@ -685,8 +670,6 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->out_video_width         ) params->out_video_width         = DEF_FFENCODER_PARAMS.out_video_width;
     if (!params->out_video_height        ) params->out_video_height        = DEF_FFENCODER_PARAMS.out_video_height;
     if (!params->out_video_frame_rate    ) params->out_video_frame_rate    = DEF_FFENCODER_PARAMS.out_video_frame_rate;
-    if (!params->out_jpeg_width          ) params->out_jpeg_width          = DEF_FFENCODER_PARAMS.out_jpeg_width;
-    if (!params->out_jpeg_height         ) params->out_jpeg_height         = DEF_FFENCODER_PARAMS.out_jpeg_height;
     if (!params->start_apts              ) params->start_apts              = DEF_FFENCODER_PARAMS.start_apts;
     if (!params->start_vpts              ) params->start_vpts              = DEF_FFENCODER_PARAMS.start_vpts;
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
@@ -890,33 +873,98 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     return 0;
 }
 
-int ffencoder_jpeg(void *ctxt, char *file, void *data[8], int linesize[8])
+void* ffencoder_jpeg_init(void)
 {
-    FFENCODER *encoder = (FFENCODER*)ctxt;
+    // allocate context for ffencoder
+    JPGENCODER *encoder = (JPGENCODER*)calloc(1, sizeof(JPGENCODER));
+    if (!encoder) {
+        return NULL;
+    }
+
+    // init variables
+    encoder->ofmt  = AV_PIX_FMT_YUV420P;
+    encoder->scale = SWS_FAST_BILINEAR ;
+
+    // init ffmpeg library
+    av_register_all();
+
+    return encoder;
+}
+
+int ffencoder_jpeg_save(void *ctxt, char *file, void *data[8], int linesize[8], int ifmt, int iw, int ih, int ow, int oh)
+{
+    JPGENCODER *encoder = (JPGENCODER*)ctxt;
 
     // check valid
     if (!ctxt) return -1;
 
-    // check encoding or not
-    if (encoder->jpg_file[0]) {
-        return -1;
+    // check encoder busy or not
+    if (encoder->file) {
+        return -1; // encoder busy
     }
     else {
-        strcpy(encoder->jpg_file, file);
+        encoder->file = file;
+    }
+
+    if (  ifmt != encoder->ifmt
+       || iw != encoder->iw || ih != encoder->ih
+       || ow != encoder->ow || oh != encoder->oh ) {
+
+        if (encoder->sws_ctx) {
+            sws_freeContext(encoder->sws_ctx);
+        }
+        encoder->sws_ctx = sws_getContext(iw, ih, (AVPixelFormat)ifmt,
+            ow, oh, encoder->ofmt, encoder->scale, NULL, NULL, NULL);
+        if (!encoder->sws_ctx) {
+            printf("could not initialize the conversion context jpg\n");
+            exit(1);
+        }
+
+        if (ow != encoder->ow || oh != encoder->oh) {
+            // free jpeg picture frame
+            av_frame_unref(&encoder->picture);
+
+            // alloc picture
+            alloc_picture(&encoder->picture, encoder->ofmt, ow, oh);
+        }
+
+        encoder->ow   = ow;
+        encoder->oh   = oh;
+        encoder->ifmt = (AVPixelFormat)ifmt;
+        encoder->iw   = iw;
+        encoder->ih   = ih;
     }
 
     // scale picture
     sws_scale(
-        encoder->jpg_sws_ctx,
+        encoder->sws_ctx,
         (const uint8_t * const *)data,
         linesize,
         0,
-        encoder->params.in_video_height,
-        encoder->jpg_picture.data,
-        encoder->jpg_picture.linesize);
+        encoder->ih,
+        encoder->picture.data,
+        encoder->picture.linesize);
 
     // create jpeg encoding thread
-    pthread_create(&encoder->jencode_thread_id, NULL, jpeg_encode_thread_proc, encoder);
+    pthread_create(&encoder->thread_id, NULL, jpeg_encode_thread_proc, encoder);
+
     return 0;
+}
+
+void ffencoder_jpeg_free(void *ctxt)
+{
+    JPGENCODER *encoder = (JPGENCODER*)ctxt;
+    if (!ctxt) return;
+
+    // wait jpeg encode thread exit
+    pthread_join(encoder->thread_id, NULL);
+
+    // free jpeg picture frame
+    av_frame_unref(&encoder->picture);
+
+    // free sws context
+    sws_freeContext(encoder->sws_ctx);
+
+    free(ctxt);
 }
 

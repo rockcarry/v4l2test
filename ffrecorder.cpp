@@ -1,4 +1,5 @@
 // 包含头文件
+#include <limits.h>
 #include "micdev.h"
 #include "camdev.h"
 #include "ffencoder.h"
@@ -24,6 +25,10 @@ typedef struct
 
     int audio_source[MAX_ENCODER_NUM];
     int video_source[MAX_ENCODER_NUM];
+
+    void *jpgenc;
+    char  take_photo_file[MAX_CAMDEV_NUM][PATH_MAX];
+    int   take_photo_flags;
 } FFRECORDER;
 
 // 内部全局变量定义
@@ -113,6 +118,16 @@ int camdev0_capture_callback_proc(void *r, void *data[8], int linesize[8])
         }
         recorder->state &= ~FRF_RECORD_CACK;
     }
+
+    // use jpgenc to take photo
+    if (recorder->take_photo_flags & (1 << 0)) {
+        printf("camdev0 take photo %s !\n", recorder->take_photo_file[0]);
+        ffencoder_jpeg_save(recorder->jpgenc, recorder->take_photo_file[0], data, linesize,
+            v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[0], CAMDEV_PARAM_VIDEO_PIXFMT)),
+            recorder->params.cam_frame_width_0, recorder->params.cam_frame_height_0,
+            recorder->params.cam_frame_width_0, recorder->params.cam_frame_height_0);
+        recorder->take_photo_flags &= ~(1 << 0);
+    }
     return 0;
 }
 
@@ -129,6 +144,15 @@ int camdev1_capture_callback_proc(void *r, void *data[8], int linesize[8])
             }
         }
         recorder->state &= ~FRF_RECORD_CACK;
+    }
+
+    // use jpgenc to take photo
+    if (recorder->take_photo_flags & (1 << 1)) {
+        ffencoder_jpeg_save(recorder->jpgenc, recorder->take_photo_file[1], data, linesize,
+            v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[1], CAMDEV_PARAM_VIDEO_PIXFMT)),
+            recorder->params.cam_frame_width_1, recorder->params.cam_frame_height_1,
+            recorder->params.cam_frame_width_1, recorder->params.cam_frame_height_1);
+        recorder->take_photo_flags &= ~(1 << 1);
     }
     return 0;
 }
@@ -202,6 +226,11 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
         printf("failed to init camdev1 !\n");
     }
 
+    recorder->jpgenc = ffencoder_jpeg_init();
+    if (!recorder->jpgenc) {
+        printf("failed to init jpgenc !\n");
+    }
+
     // start micdev capture
     micdev_start_capture(recorder->micdev[0]);
 
@@ -233,6 +262,9 @@ void ffrecorder_free(void *ctxt)
     micdev_close(recorder->micdev[0]);
     camdev_close(recorder->camdev[0]);
     camdev_close(recorder->camdev[1]);
+
+    // free jpg encoder
+    ffencoder_jpeg_free(recorder->jpgenc);
 
     // free context
     free(recorder);
@@ -442,5 +474,13 @@ void ffrecorder_record_video_source(void *ctxt, int encidx, int source)
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
     if (!recorder || encidx < 0 || encidx >= MAX_ENCODER_NUM) return;
     recorder->video_source[encidx] = source;
+}
+
+void ffrecorder_take_photo(void *ctxt, int camidx, char *filename)
+{
+    FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    if (!recorder || camidx < 0 || camidx >= MAX_CAMDEV_NUM) return;
+    strcpy(recorder->take_photo_file[camidx], filename);
+    recorder->take_photo_flags |= (1 << camidx);
 }
 

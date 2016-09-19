@@ -21,6 +21,8 @@ public class MediaRecorder {
     public static native void nativeSetAudioSource(long ctxt, int encidx, int source);
     public static native void nativeSetVideoSource(long ctxt, int encidx, int source);
 
+    public static native void nativeTakePhoto(long ctxt, int camidx, String filename);
+
     static {
         System.loadLibrary("ffrecorder_jni");
     }

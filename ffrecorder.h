@@ -74,6 +74,7 @@ void  ffrecorder_record_start  (void *ctxt, int encidx, char *filename);
 void  ffrecorder_record_stop   (void *ctxt, int encidx);
 void  ffrecorder_record_audio_source(void *ctxt, int encidx, int source);
 void  ffrecorder_record_video_source(void *ctxt, int encidx, int source);
+void  ffrecorder_take_photo    (void *ctxt, int camidx, char *filename);
 
 #endif
 

@@ -116,6 +116,14 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetAudioSource
 JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetVideoSource
   (JNIEnv *, jclass, jlong, jint, jint);
 
+/*
+ * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeTakePhoto
+ * Signature: (JILjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeTakePhoto
+  (JNIEnv *, jclass, jlong, jint, jstring);
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,6 +19,7 @@ int main(void)
     static uint8_t abuf[44100 / 30 * 2 * 1];
     static uint8_t vbuf[320 * 240 * 2];
     void     *encoder = NULL;
+    void     *jpegenc = NULL;
     void     *adata   [8] = { abuf };
     void     *vdata   [8] = { vbuf };
     int       linesize[8] = { 320*2};
@@ -44,8 +45,6 @@ int main(void)
         320,                       // out_video_width
         240,                       // out_video_height
         25,                        // out_video_frame_rate
-        320,                       // out_jpeg_width
-        240,                       // out_jpeg_height
 
         // other params
         0,                         // start_apts
@@ -64,7 +63,12 @@ int main(void)
         ffencoder_video(encoder, vdata, linesize);
     }
 
-    ffencoder_jpeg(encoder, "/sdcard/test.jpg", vdata, linesize);
+    jpegenc = ffencoder_jpeg_init();
+    ffencoder_jpeg_save(jpegenc, "/sdcard/test.jpg", vdata, linesize, param.in_video_pixfmt,
+        param.in_video_width, param.in_video_height,
+        param.in_video_width, param.in_video_height);
+    ffencoder_jpeg_free(jpegenc);
+
     ffencoder_free(encoder);
     printf("encode done\n");
     return 0;

@@ -26,8 +26,6 @@ typedef struct
     int   out_video_width;
     int   out_video_height;
     int   out_video_frame_rate;
-    int   out_jpeg_width;
-    int   out_jpeg_height;
 
     // other params
     int   start_apts;
@@ -42,7 +40,10 @@ void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
 int   ffencoder_audio(void *ctxt, void *data[8], int nbsample   );
 int   ffencoder_video(void *ctxt, void *data[8], int linesize[8]);
-int   ffencoder_jpeg (void *ctxt, char *file, void *data[8], int linesize[8]);
+
+void* ffencoder_jpeg_init(void);
+int   ffencoder_jpeg_save(void *ctxt, char *file, void *data[8], int linesize[8], int ifmt, int iw, int ih, int ow, int oh);
+void  ffencoder_jpeg_free(void *ctxt);
 
 #ifdef __cplusplus
 }
