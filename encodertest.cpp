@@ -44,6 +44,8 @@ int main(void)
         320,                       // out_video_width
         240,                       // out_video_height
         25,                        // out_video_frame_rate
+        320,                       // out_jpeg_width
+        240,                       // out_jpeg_height
 
         // other params
         0,                         // start_apts
