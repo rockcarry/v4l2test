@@ -26,6 +26,8 @@ typedef struct
     int   out_video_width;
     int   out_video_height;
     int   out_video_frame_rate;
+    int   out_jpeg_width;
+    int   out_jpeg_height;
 
     // other params
     int   start_apts;

@@ -95,6 +95,9 @@ typedef struct
 
     struct SwsContext *jpg_sws_ctx;
     AVPixelFormat      jpg_pix_fmt;
+    AVFrame            jpg_picture;
+    char               jpg_file[PATH_MAX];
+    pthread_t          jencode_thread_id;
 } FFENCODER;
 
 // 内部全局变量定义
@@ -118,6 +121,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     320,                        // out_video_width
     240,                        // out_video_height
     20,                         // out_video_frame_rate
+    320,                        // out_jpeg_width
+    240,                        // out_jpeg_height
 
     // other params
     0,                          // start_apts
@@ -257,6 +262,77 @@ static void* video_encode_thread_proc(void *param)
         }
     } while (got);
 
+    return NULL;
+}
+
+static void* jpeg_encode_thread_proc(void *param)
+{
+    FFENCODER       *encoder    = (FFENCODER*)param;
+    AVFormatContext *fmt_ctxt   = NULL;
+    AVOutputFormat  *out_fmt    = NULL;
+    AVStream        *stream     = NULL;
+    AVCodecContext  *codec_ctxt = NULL;
+    AVCodec         *codec      = NULL;
+
+    AVPacket packet ;
+    int      got = 0;
+    int      ret = 0;
+
+    // init packet
+    memset(&packet, 0, sizeof(AVPacket));
+
+    fmt_ctxt = avformat_alloc_context();
+    out_fmt  = av_guess_format("mjpeg", NULL, NULL);
+    fmt_ctxt->oformat = out_fmt;
+    if (avio_open(&fmt_ctxt->pb, encoder->jpg_file, AVIO_FLAG_READ_WRITE) < 0) {
+        printf("failed to open output file: %s !\n", encoder->jpg_file);
+        goto done;
+    }
+
+    stream = avformat_new_stream(fmt_ctxt, 0);
+    if (!stream) {
+        printf("failed to add stream !\n");
+        goto done;
+    }
+
+    codec_ctxt                = stream->codec;
+    codec_ctxt->codec_id      = out_fmt->video_codec;
+    codec_ctxt->codec_type    = AVMEDIA_TYPE_VIDEO;
+    codec_ctxt->pix_fmt       = AV_PIX_FMT_YUVJ420P;
+    codec_ctxt->width         = encoder->params.out_jpeg_width;
+    codec_ctxt->height        = encoder->params.out_jpeg_height;
+    codec_ctxt->time_base.num = 1;
+    codec_ctxt->time_base.den = 25;
+
+    codec = avcodec_find_encoder(codec_ctxt->codec_id);
+    if (!codec) {
+        printf("failed to find encoder !\n");
+        goto done;
+    }
+
+    if (avcodec_open2(codec_ctxt, codec, NULL) < 0) {
+        printf("failed to open encoder !\n");
+        goto done;
+    }
+
+    avcodec_encode_video2(codec_ctxt, &packet, &encoder->jpg_picture, &got);
+    if (got) {
+        ret = avformat_write_header(fmt_ctxt, NULL);
+        if (ret < 0) {
+            printf("error occurred when opening output file !\n");
+            goto done;
+        }
+        av_write_frame(fmt_ctxt, &packet);
+        av_write_trailer(fmt_ctxt);
+    }
+
+done:
+    if (codec_ctxt  ) avcodec_close(codec_ctxt);
+    if (fmt_ctxt->pb) avio_close(fmt_ctxt->pb);
+    if (fmt_ctxt    ) avformat_free_context(fmt_ctxt);
+    av_packet_unref(&packet );
+
+    encoder->jpg_file[0] = '\0';
     return NULL;
 }
 
@@ -492,22 +568,7 @@ static void open_video(FFENCODER *encoder)
         encoder->params.scale_flags,
         NULL, NULL, NULL);
     if (!encoder->sws_ctx) {
-        printf("could not initialize the conversion context\n");
-        exit(1);
-    }
-
-    encoder->jpg_pix_fmt = AV_PIX_FMT_YUV420P;
-    encoder->jpg_sws_ctx = sws_getContext(
-        encoder->params.in_video_width,
-        encoder->params.in_video_height,
-        (AVPixelFormat)encoder->params.in_video_pixfmt,
-        encoder->params.in_video_width,
-        encoder->params.in_video_height,
-        encoder->jpg_pix_fmt,
-        encoder->params.scale_flags,
-        NULL, NULL, NULL);
-    if (!encoder->jpg_sws_ctx) {
-        printf("could not initialize the conversion context\n");
+        printf("could not initialize the conversion context mp4\n");
         exit(1);
     }
 
@@ -520,6 +581,23 @@ static void open_video(FFENCODER *encoder)
     for (i=0; i<encoder->params.video_buffer_number; i++) {
         alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
     }
+
+    encoder->jpg_pix_fmt = AV_PIX_FMT_YUV420P;
+    encoder->jpg_sws_ctx = sws_getContext(
+        encoder->params.in_video_width,
+        encoder->params.in_video_height,
+        (AVPixelFormat)encoder->params.in_video_pixfmt,
+        encoder->params.out_jpeg_width,
+        encoder->params.out_jpeg_height,
+        encoder->jpg_pix_fmt,
+        encoder->params.scale_flags,
+        NULL, NULL, NULL);
+    if (!encoder->jpg_sws_ctx) {
+        printf("could not initialize the conversion context jpg\n");
+        exit(1);
+    }
+    // alloc picture
+    alloc_picture(&encoder->jpg_picture, encoder->jpg_pix_fmt, encoder->params.out_jpeg_width, encoder->params.out_jpeg_height);
 
     sem_init(&encoder->vsemr, 0, 0                                  );
     sem_init(&encoder->vsemw, 0, encoder->params.video_buffer_number);
@@ -545,6 +623,9 @@ static void close_astream(FFENCODER *encoder)
     free(encoder->aframes);
     //-- for audio frames
 
+    // free jpeg picture frame
+    av_frame_unref(&encoder->jpg_picture);
+
     // free temp audio frame
     av_frame_unref(&encoder->aframetmp);
 
@@ -558,6 +639,7 @@ static void close_vstream(FFENCODER *encoder)
 
     encoder->thread_state |= FFENCODER_TS_EXIT;
     pthread_join(encoder->vencode_thread_id, NULL);
+    pthread_join(encoder->jencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);
     sem_destroy(&encoder->vsemw);
@@ -603,6 +685,8 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->out_video_width         ) params->out_video_width         = DEF_FFENCODER_PARAMS.out_video_width;
     if (!params->out_video_height        ) params->out_video_height        = DEF_FFENCODER_PARAMS.out_video_height;
     if (!params->out_video_frame_rate    ) params->out_video_frame_rate    = DEF_FFENCODER_PARAMS.out_video_frame_rate;
+    if (!params->out_jpeg_width          ) params->out_jpeg_width          = DEF_FFENCODER_PARAMS.out_jpeg_width;
+    if (!params->out_jpeg_height         ) params->out_jpeg_height         = DEF_FFENCODER_PARAMS.out_jpeg_height;
     if (!params->start_apts              ) params->start_apts              = DEF_FFENCODER_PARAMS.start_apts;
     if (!params->start_vpts              ) params->start_vpts              = DEF_FFENCODER_PARAMS.start_vpts;
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
@@ -809,25 +893,17 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
 int ffencoder_jpeg(void *ctxt, char *file, void *data[8], int linesize[8])
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
-    AVFormatContext *fmt_ctxt   = NULL;
-    AVOutputFormat  *out_fmt    = NULL;
-    AVStream        *stream     = NULL;
-    AVCodecContext  *codec_ctxt = NULL;
-    AVCodec         *codec      = NULL;
-
-    AVFrame  picture;
-    AVPacket packet ;
-    int      got = 0;
 
     // check valid
     if (!ctxt) return -1;
 
-    // init picture & packet
-    memset(&picture, 0, sizeof(AVFrame ));
-    memset(&packet , 0, sizeof(AVPacket));
-
-    // alloc picture
-    alloc_picture(&picture, encoder->jpg_pix_fmt, encoder->params.in_video_width, encoder->params.in_video_height);
+    // check encoding or not
+    if (encoder->jpg_file[0]) {
+        return -1;
+    }
+    else {
+        strcpy(encoder->jpg_file, file);
+    }
 
     // scale picture
     sws_scale(
@@ -836,57 +912,11 @@ int ffencoder_jpeg(void *ctxt, char *file, void *data[8], int linesize[8])
         linesize,
         0,
         encoder->params.in_video_height,
-        picture.data,
-        picture.linesize);
+        encoder->jpg_picture.data,
+        encoder->jpg_picture.linesize);
 
-    fmt_ctxt = avformat_alloc_context();
-    out_fmt  = av_guess_format("mjpeg", NULL, NULL);
-    fmt_ctxt->oformat = out_fmt;
-    if (avio_open(&fmt_ctxt->pb, file, AVIO_FLAG_READ_WRITE) < 0) {
-        printf("failed to open output file !\n");
-        goto done;
-    }
-
-    stream = avformat_new_stream(fmt_ctxt, 0);
-    if (!stream) {
-        printf("failed to add stream !\n");
-        goto done;
-    }
-
-    codec_ctxt                = stream->codec;
-    codec_ctxt->codec_id      = out_fmt->video_codec;
-    codec_ctxt->codec_type    = AVMEDIA_TYPE_VIDEO;
-    codec_ctxt->pix_fmt       = AV_PIX_FMT_YUVJ420P;
-    codec_ctxt->width         = encoder->params.in_video_width;
-    codec_ctxt->height        = encoder->params.in_video_height;
-    codec_ctxt->time_base.num = 1;
-    codec_ctxt->time_base.den = 25;
-
-    codec = avcodec_find_encoder(codec_ctxt->codec_id);
-    if (!codec) {
-        printf("failed to find encoder !\n");
-        goto done;
-    }
-
-    if (avcodec_open2(codec_ctxt, codec, NULL) < 0) {
-        printf("failed to open encoder !\n");
-        goto done;
-    }
-
-    avcodec_encode_video2(codec_ctxt, &packet, &picture, &got);
-    if (got) {
-        avformat_write_header(fmt_ctxt, NULL);
-        av_write_frame(fmt_ctxt, &packet);
-        av_write_trailer(fmt_ctxt);
-    }
-
-done:
-    if (codec_ctxt  ) avcodec_close(codec_ctxt);
-    if (fmt_ctxt->pb) avio_close(fmt_ctxt->pb);
-    if (fmt_ctxt    ) avformat_free_context(fmt_ctxt);
-    av_frame_unref (&picture);
-    av_packet_unref(&packet );
-
-    return got ? 0 : -1;
+    // create jpeg encoding thread
+    pthread_create(&encoder->jencode_thread_id, NULL, jpeg_encode_thread_proc, encoder);
+    return 0;
 }
 
