@@ -351,7 +351,7 @@ done:
 
 #ifdef ENABLE_MEDIARECORDER_JNI
     if (env && encoder->jcls_mr && encoder->jobj_mr && encoder->jmid_cb) {
-        env->CallVoidMethod(encoder->jobj_mr, encoder->jmid_cb, env->NewStringUTF(encoder->file));
+        env->CallVoidMethod(encoder->jobj_mr, encoder->jmid_cb, env->NewStringUTF(encoder->file), encoder->ow, encoder->oh);
     }
 
     // need call DetachCurrentThread
@@ -998,7 +998,7 @@ void ffencoder_jpeg_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj)
     if (!encoder) return;
     encoder->jcls_mr = env->GetObjectClass(obj);
     encoder->jobj_mr = env->NewGlobalRef(obj);
-    encoder->jmid_cb = env->GetMethodID(encoder->jcls_mr, "internalTakePhotoCallback", "(Ljava/lang/String;)V");
+    encoder->jmid_cb = env->GetMethodID(encoder->jcls_mr, "internalTakePhotoCallback", "(Ljava/lang/String;II)V");
 }
 #endif
 

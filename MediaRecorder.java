@@ -74,16 +74,16 @@ public class MediaRecorder {
     }
 
     public interface takePhotoCallback {
-        public void onPhotoTaken(String filename);
+        public void onPhotoTaken(String filename, int w, int h);
     }
 
 
     //++ for take photo callback
     private takePhotoCallback mTakePhotoCB = null;
 
-    private void internalTakePhotoCallback(String filename) {
+    private void internalTakePhotoCallback(String filename, int w, int h) {
         if (mTakePhotoCB != null) {
-            mTakePhotoCB.onPhotoTaken(filename);
+            mTakePhotoCB.onPhotoTaken(filename, w, h);
         }
     }
 
