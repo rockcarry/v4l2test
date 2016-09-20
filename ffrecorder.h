@@ -76,6 +76,9 @@ void  ffrecorder_record_audio_source(void *ctxt, int encidx, int source);
 void  ffrecorder_record_video_source(void *ctxt, int encidx, int source);
 void  ffrecorder_take_photo    (void *ctxt, int camidx, char *filename);
 
+#ifdef ENABLE_MEDIARECORDER_JNI
+void  ffrecorder_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj);
 #endif
 
+#endif
 

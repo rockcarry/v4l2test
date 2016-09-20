@@ -107,6 +107,12 @@ typedef struct
     AVFrame            picture;
     char              *file;
     pthread_t          thread_id;
+
+#ifdef ENABLE_MEDIARECORDER_JNI
+    jclass     jcls_mr;
+    jobject    jobj_mr;
+    jmethodID  jmid_cb;
+#endif
 } JPGENCODER;
 
 // 内部全局变量定义
@@ -285,6 +291,10 @@ static void* jpeg_encode_thread_proc(void *param)
     int      got = 0;
     int      ret = 0;
 
+#ifdef ENABLE_MEDIARECORDER_JNI
+    JNIEnv *env = get_jni_env();
+#endif
+
     // init packet
     memset(&packet, 0, sizeof(AVPacket));
 
@@ -337,7 +347,16 @@ done:
     if (codec_ctxt  ) avcodec_close(codec_ctxt);
     if (fmt_ctxt->pb) avio_close(fmt_ctxt->pb);
     if (fmt_ctxt    ) avformat_free_context(fmt_ctxt);
-    av_packet_unref(&packet );
+    av_packet_unref(&packet);
+
+#ifdef ENABLE_MEDIARECORDER_JNI
+    if (env && encoder->jcls_mr && encoder->jobj_mr && encoder->jmid_cb) {
+        env->CallVoidMethod(encoder->jobj_mr, encoder->jmid_cb, env->NewStringUTF(encoder->file));
+    }
+
+    // need call DetachCurrentThread
+    g_jvm->DetachCurrentThread();
+#endif
 
     encoder->file = NULL;
     return NULL;
@@ -965,6 +984,21 @@ void ffencoder_jpeg_free(void *ctxt)
     // free sws context
     sws_freeContext(encoder->sws_ctx);
 
+#ifdef ENABLE_MEDIARECORDER_JNI
+    get_jni_env()->DeleteGlobalRef(encoder->jobj_mr);
+#endif
+
     free(ctxt);
 }
+
+#ifdef ENABLE_MEDIARECORDER_JNI
+void ffencoder_jpeg_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj)
+{
+    JPGENCODER *encoder = (JPGENCODER*)ctxt;
+    if (!encoder) return;
+    encoder->jcls_mr = env->GetObjectClass(obj);
+    encoder->jobj_mr = env->NewGlobalRef(obj);
+    encoder->jmid_cb = env->GetMethodID(encoder->jcls_mr, "internalTakePhotoCallback", "(Ljava/lang/String;)V");
+}
+#endif
 

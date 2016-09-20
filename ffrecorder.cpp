@@ -484,3 +484,12 @@ void ffrecorder_take_photo(void *ctxt, int camidx, char *filename)
     recorder->take_photo_flags |= (1 << camidx);
 }
 
+#ifdef ENABLE_MEDIARECORDER_JNI
+void ffrecorder_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj)
+{
+    FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    if (!recorder) return;
+    ffencoder_jpeg_init_jni_callback(recorder->jpgenc, env, obj);
+}
+#endif
+

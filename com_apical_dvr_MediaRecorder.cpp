@@ -49,6 +49,17 @@ JNIEXPORT JNIEnv* get_jni_env(void)
 
 /*
  * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeInitCallback
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeInitCallback
+  (JNIEnv *env, jobject obj, jlong ctxt)
+{
+    ffrecorder_init_jni_callback((void*)ctxt, env, obj);
+}
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeInit
  * Signature: ()J
  */

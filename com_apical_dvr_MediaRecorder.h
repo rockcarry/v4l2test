@@ -4,13 +4,22 @@
 
 #ifndef _Included_com_apical_dvr_MediaRecorder
 #define _Included_com_apical_dvr_MediaRecorder
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 extern JavaVM* g_jvm;
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*);
 JNIEXPORT JNIEnv* get_jni_env(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeInitCallback
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeInitCallback
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     com_apical_dvr_MediaRecorder

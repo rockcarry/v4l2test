@@ -37,8 +37,8 @@ typedef struct {
     jbyteArray  audio_buffer;
 } MICDEV;
 
-extern "C" JavaVM* g_jvm;
-extern "C" JNIEXPORT JNIEnv* get_jni_env(void);
+extern    JavaVM* g_jvm;
+JNIEXPORT JNIEnv* get_jni_env(void);
 
 // 内部函数实现
 static void* micdev_capture_thread_proc(void *param)

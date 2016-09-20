@@ -1,6 +1,12 @@
 #ifndef __FFENCODER_H_
 #define __FFENCODER_H_
 
+#ifdef ENABLE_MEDIARECORDER_JNI
+#include <jni.h>
+extern    JavaVM* g_jvm;
+JNIEXPORT JNIEnv* get_jni_env(void);
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +50,10 @@ int   ffencoder_video(void *ctxt, void *data[8], int linesize[8]);
 void* ffencoder_jpeg_init(void);
 int   ffencoder_jpeg_save(void *ctxt, char *file, void *data[8], int linesize[8], int ifmt, int iw, int ih, int ow, int oh);
 void  ffencoder_jpeg_free(void *ctxt);
+
+#ifdef ENABLE_MEDIARECORDER_JNI
+void  ffencoder_jpeg_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj);
+#endif
 
 #ifdef __cplusplus
 }

@@ -132,7 +132,8 @@ LOCAL_MODULE := libffrecorder_jni
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += \
-    -DUSE_MICDEV_ANDROID
+    -DUSE_MICDEV_ANDROID \
+    -DENABLE_MEDIARECORDER_JNI
 
 LOCAL_SRC_FILES := \
     micdev_android.cpp \
