@@ -35,7 +35,7 @@ How to build
 
 Features
 ========
-1.  audio capture from tinyalsa
+1.  audio capture from tinyalsa/AudioRecord
 2.  video capture from v4l2
 3.  audio & video encoding into mp4
 4.  rendering video on screen
@@ -45,19 +45,15 @@ Features
 9.  optimized for allwinner A33 platorm
 10. record segmented video with out dropping any frame
 11. auto drop frame when could't encoding in time
+12. support push rtmp/hls live stream
 
 
 TODO
 ====
 1.  implments hardware encoding for A33 platfrom
-I plan to write a hardware H264 encoding ffmpeg codec for A33 platform
+    plan to write a hardware H264 encoding ffmpeg codec for A33 platform
 
-2.  live streaming
-support live streaming video to http or rtmp
-
-3.  support capture audio from android.media.AudioRecord
-
-4.  stability and performance
+2.  stability and performance
 
 
 
