@@ -5,6 +5,10 @@
 #include "micdev_android.h"
 #include "micdev_tinyalsa.h"
 
+extern "C" {
+#include <libavutil/frame.h>
+}
+
 // 预编译开关定义
 // #define USE_MICDEV_ANDROID
 
@@ -44,7 +48,7 @@
 
 // 类型定义
 // micdev capture callback
-typedef int (*MICDEV_CAPTURE_CALLBACK)(void *recorder, void *data[8], int nbsample);
+typedef int (*MICDEV_CAPTURE_CALLBACK)(void *recorder, void *data[AV_NUM_DATA_POINTERS], int nbsample);
 
 
 #endif

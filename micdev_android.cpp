@@ -64,7 +64,7 @@ static void* micdev_capture_thread_proc(void *param)
         }
 
         if (mic->callback) {
-            void *data[8] = { mic->buffer };
+            void *data[AV_NUM_DATA_POINTERS] = { mic->buffer };
             int   sampnum = nread / (2 * mic->channels);
             mic->callback(mic->recorder, data, sampnum);
         }

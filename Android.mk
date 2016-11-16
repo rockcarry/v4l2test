@@ -10,6 +10,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
 LOCAL_SRC_FILES := \
     v4l2test.cpp \
+    ffjpeg.cpp \
     camdev.cpp
 
 LOCAL_SHARED_LIBRARIES := \
@@ -50,6 +51,7 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
 
 LOCAL_SRC_FILES := \
+    ffjpeg.cpp \
     ffencoder.cpp \
     encodertest.cpp
 
@@ -91,6 +93,7 @@ LOCAL_C_INCLUDES := external/tinyalsa/include
 
 LOCAL_SRC_FILES := \
     micdev_tinyalsa.cpp \
+    ffjpeg.cpp \
     camdev.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \
@@ -137,6 +140,7 @@ LOCAL_CFLAGS += \
 
 LOCAL_SRC_FILES := \
     micdev_android.cpp \
+    ffjpeg.cpp \
     camdev.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \

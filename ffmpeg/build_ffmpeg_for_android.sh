@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-EXTRA_CFLAGS="-I$PWD/include -Os -march=armv7-a -mfloat-abi=softfp -mfpu=neon -D__ARM_ARCH_7A__ -D__ANDROID__ -DNDEBUG"
-EXTRA_LDFLAGS="-L$PWD/lib -march=armv7-a"
+EXTRA_CFLAGS="-I$PWD/ffmpeg-android-sdk/include -Os -march=armv7-a -mfloat-abi=softfp -mfpu=neon -D__ARM_ARCH_7A__ -D__ANDROID__ -DNDEBUG"
+EXTRA_LDFLAGS="-L$PWD/ffmpeg-android-sdk/lib -march=armv7-a"
 
 # speed of faac is slower than ffmpeg native aac encoder now
 # so we do not use faac
@@ -39,7 +39,7 @@ if [ ! -d x264 ]; then
   git clone git://git.videolan.org/x264.git
 fi
 cd x264
-./configure --prefix=$PWD/.. \
+./configure --prefix=$PWD/../ffmpeg-android-sdk \
 --enable-strip \
 --enable-static \
 --enable-shared \
@@ -56,6 +56,7 @@ if [ ! -d ffmpeg ]; then
 fi
 cd ffmpeg
 ./configure \
+--pkg-config=pkg-config \
 --arch=armv7 \
 --target-os=android \
 --enable-cross-compile \

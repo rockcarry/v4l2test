@@ -1,11 +1,10 @@
 #ifndef __FFENCODER_H_
 #define __FFENCODER_H_
 
-#ifdef ENABLE_MEDIARECORDER_JNI
-#include <jni.h>
-extern    JavaVM* g_jvm;
-JNIEXPORT JNIEnv* get_jni_env(void);
-#endif
+// 包含头文件
+extern "C" {
+#include <libavutil/frame.h>
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,16 +43,8 @@ typedef struct
 // 函数声明
 void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
-int   ffencoder_audio(void *ctxt, void *data[8], int nbsample   );
-int   ffencoder_video(void *ctxt, void *data[8], int linesize[8]);
-
-void* ffencoder_jpeg_init(void);
-int   ffencoder_jpeg_save(void *ctxt, char *file, void *data[8], int linesize[8], int ifmt, int iw, int ih, int ow, int oh);
-void  ffencoder_jpeg_free(void *ctxt);
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-void  ffencoder_jpeg_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj);
-#endif
+int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample);
+int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS]);
 
 #ifdef __cplusplus
 }

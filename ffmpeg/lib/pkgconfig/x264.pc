@@ -1,4 +1,4 @@
-prefix=/home/xujb/x264/..
+prefix=/home/xujb/x264/../ffmpeg-android-sdk
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

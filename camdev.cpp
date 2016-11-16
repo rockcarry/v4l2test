@@ -8,6 +8,7 @@
 #include <linux/videodev2.h>
 #include <utils/Log.h>
 #include "ffencoder.h"
+#include "ffjpeg.h"
 #include "camdev.h"
 
 extern "C" {
@@ -54,6 +55,7 @@ typedef struct {
     SwsContext             *swsctxt;
     CAMDEV_CAPTURE_CALLBACK callback;
     void                   *recorder;
+    void                   *jpegdec;
 } CAMDEV;
 
 // 内部函数实现
@@ -105,6 +107,24 @@ static void render_v4l2(CAMDEV *cam,
         return;
     }
 
+    uint8_t* dst_data[AV_NUM_DATA_POINTERS]     = { (uint8_t*)dstbuf, (uint8_t*)dstbuf + dstw * dsth, (uint8_t*)dstbuf + dstw * dsth };
+    uint8_t* src_data[AV_NUM_DATA_POINTERS]     = { (uint8_t*)srcbuf, (uint8_t*)srcbuf + srcw * srch, (uint8_t*)srcbuf + srcw * srch };
+    int      dst_linesize[AV_NUM_DATA_POINTERS] = { dstw, dstw / 1, dstw / 1 };
+    int      src_linesize[AV_NUM_DATA_POINTERS] = { srcw, srcw / 1, srcw / 1 };
+    if (srcfmt == V4L2_PIX_FMT_YUYV) {
+        src_linesize[0] = srcw * 2;
+    }
+    if (srcfmt == V4L2_PIX_FMT_MJPEG) {
+        AVFrame *pic = ffjpeg_decoder_decode(cam->jpegdec, srcbuf, srclen);
+        sws_src_fmt = (AVPixelFormat)pic->format;
+        memcpy(src_data    , pic->data    , sizeof(src_data    ));
+        memcpy(src_linesize, pic->linesize, sizeof(src_linesize));
+    }
+    if (dstfmt == HAL_PIXEL_FORMAT_RGBX_8888) {
+        dst_linesize[0] = dstw * 4;
+    }
+
+    //++ do sws scale
     if (cam->win_w != dstw || cam->win_h != dsth) {
         if (cam->swsctxt) {
             sws_freeContext(cam->swsctxt);
@@ -113,20 +133,8 @@ static void render_v4l2(CAMDEV *cam,
         cam->win_w   = dstw;
         cam->win_h   = dsth;
     }
-
-    uint8_t* dst_data[8]     = { (uint8_t*)dstbuf, (uint8_t*)dstbuf + dstw * dsth, (uint8_t*)dstbuf + dstw * dsth };
-    uint8_t* src_data[8]     = { (uint8_t*)srcbuf, (uint8_t*)srcbuf + srcw * srch, (uint8_t*)srcbuf + srcw * srch };
-    int      dst_linesize[8] = { dstw, dstw / 1, dstw / 1 };
-    int      src_linesize[8] = { srcw, srcw / 1, srcw / 1 };
-    if (srcfmt == V4L2_PIX_FMT_YUYV) {
-        src_linesize[0] = srcw * 2;
-    }
-    if (dstfmt == HAL_PIXEL_FORMAT_RGBX_8888) {
-        dst_linesize[0] = dstw * 4;
-    }
-
-    // do sws scale
     sws_scale(cam->swsctxt, src_data, src_linesize, 0, srch, dst_data, dst_linesize);
+    //-- do sws scale
 }
 
 static void* camdev_capture_thread_proc(void *param)
@@ -214,11 +222,11 @@ static void* camdev_capture_thread_proc(void *param)
         }
 
         if (cam->callback) {
-            int      camw        = cam->cam_w;
-            int      camh        = cam->cam_h;
-            uint8_t *cbuf        = (uint8_t*)cam->vbs[cam->buf.index].addr;
-            void    *data[8]     = { (uint8_t*)cbuf, (uint8_t*)cbuf + camw * camh, (uint8_t*)cbuf + camw * camh };
-            int      linesize[8] = { camw, camw / 1, camw / 1 };
+            int      camw = cam->cam_w;
+            int      camh = cam->cam_h;
+            uint8_t *cbuf = (uint8_t*)cam->vbs[cam->buf.index].addr;
+            void    *data[AV_NUM_DATA_POINTERS]     = { (uint8_t*)cbuf, (uint8_t*)cbuf + camw * camh, (uint8_t*)cbuf + camw * camh };
+            int      linesize[AV_NUM_DATA_POINTERS] = { camw, camw / 1, camw / 1 };
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
             }
@@ -325,7 +333,12 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         ioctl(cam->fd, VIDIOC_S_INPUT, &input);
     }
 
-    if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
+    if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_MJPEG, &w, &h)) {
+        cam->cam_pixfmt = V4L2_PIX_FMT_MJPEG;
+        cam->cam_w      = w;
+        cam->cam_h      = h;
+    }
+    else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
         cam->cam_pixfmt = V4L2_PIX_FMT_NV21;
         cam->cam_w      = w;
         cam->cam_h      = h;
@@ -360,7 +373,7 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         cam->cam_stride = v4l2fmt.fmt.pix.bytesperline;
     }
     else {
-        ALOGW("failed to camera preview size and pixel format !\n");
+        ALOGW("failed to set camera preview size and pixel format !\n");
         close(cam->fd);
         free (cam);
         return NULL;
@@ -403,6 +416,10 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         ioctl(cam->fd, VIDIOC_QBUF, &cam->buf);
     }
 
+    if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
+        cam->jpegdec = ffjpeg_decoder_init();
+    }
+
     // set test frame rate flag
     cam->thread_state |= CAMDEV_TS_PAUSE | CAMDEV_TS_TEST_FRATE;
 
@@ -420,6 +437,10 @@ void camdev_close(void *ctxt)
     // wait thread safely exited
     cam->thread_state |= CAMDEV_TS_EXIT;
     pthread_join(cam->thread_id, NULL);
+
+    if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
+        ffjpeg_decoder_free(cam->jpegdec);
+    }
 
     // unmap buffers
     for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {

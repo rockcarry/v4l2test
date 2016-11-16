@@ -1,9 +1,13 @@
 // 包含头文件
 #include <stdlib.h>
 #include <stdio.h>
+#include "ffjpeg.h"
+#include "ffencoder.h"
+
+extern "C" {
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
-#include "ffencoder.h"
+}
 
 static void rand_buf(void *buf, int size)
 {
@@ -20,10 +24,11 @@ int main(void)
     static uint8_t vbuf[320 * 240 * 2];
     void     *encoder = NULL;
     void     *jpegenc = NULL;
-    void     *adata   [8] = { abuf };
-    void     *vdata   [8] = { vbuf };
-    int       linesize[8] = { 320*2};
+    void     *adata   [AV_NUM_DATA_POINTERS] = { abuf };
+    void     *vdata   [AV_NUM_DATA_POINTERS] = { vbuf };
+    int       linesize[AV_NUM_DATA_POINTERS] = { 320*2};
     int       i;
+    AVFrame   frame;
 
     printf("encode start\n");
     FFENCODER_PARAMS param = {
@@ -63,11 +68,14 @@ int main(void)
         ffencoder_video(encoder, vdata, linesize);
     }
 
-    jpegenc = ffencoder_jpeg_init();
-    ffencoder_jpeg_save(jpegenc, "/sdcard/test.jpg", vdata, linesize, param.in_video_pixfmt,
-        param.in_video_width, param.in_video_height,
-        param.in_video_width, param.in_video_height);
-    ffencoder_jpeg_free(jpegenc);
+    jpegenc = ffjpeg_encoder_init();
+    frame.format   = param.in_video_pixfmt;
+    frame.width    = param.in_video_width;
+    frame.height   = param.in_video_height;
+    memcpy(frame.data,     vdata   , sizeof(vdata   ));
+    memcpy(frame.linesize, linesize, sizeof(linesize));
+    ffjpeg_encoder_encode(jpegenc, "/sdcard/test.jpg", frame.width, frame.height, &frame);
+    ffjpeg_encoder_free(jpegenc);
 
     ffencoder_free(encoder);
     printf("encode done\n");

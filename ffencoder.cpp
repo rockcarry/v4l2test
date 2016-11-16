@@ -25,10 +25,10 @@ typedef struct {
     int e;
 } FRAMEDROPPER;
 
-void frame_dropper_init   (FRAMEDROPPER *pfd, int frate_in, int frate_out);
-int  frame_dropper_clocked(FRAMEDROPPER *pfd);
+static void frame_dropper_init   (FRAMEDROPPER *pfd, int frate_in, int frate_out);
+static int  frame_dropper_clocked(FRAMEDROPPER *pfd);
 
-void frame_dropper_init(FRAMEDROPPER *pfd, int frate_in, int frate_out)
+static void frame_dropper_init(FRAMEDROPPER *pfd, int frate_in, int frate_out)
 {
     pfd->x  = 0;
     pfd->y  = 0;
@@ -37,7 +37,7 @@ void frame_dropper_init(FRAMEDROPPER *pfd, int frate_in, int frate_out)
     pfd->dy = frate_out;
 }
 
-int frame_dropper_clocked(FRAMEDROPPER *pfd)
+static int frame_dropper_clocked(FRAMEDROPPER *pfd)
 {
     pfd->x++;
     pfd->e += pfd->dy;
@@ -93,27 +93,6 @@ typedef struct
     pthread_t          vencode_thread_id;
     pthread_mutex_t    mutex;
 } FFENCODER;
-
-typedef struct
-{
-    struct SwsContext *sws_ctx;
-    AVPixelFormat      ifmt;
-    int                iw;
-    int                ih;
-    AVPixelFormat      ofmt;
-    int                ow;
-    int                oh;
-    int                scale;
-    AVFrame            picture;
-    char              *file;
-    pthread_t          thread_id;
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-    jclass     jcls_mr;
-    jobject    jobj_mr;
-    jmethodID  jmid_cb;
-#endif
-} JPGENCODER;
 
 // 内部全局变量定义
 static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
@@ -275,90 +254,6 @@ static void* video_encode_thread_proc(void *param)
         }
     } while (got);
 
-    return NULL;
-}
-
-static void* jpeg_encode_thread_proc(void *param)
-{
-    JPGENCODER      *encoder    = (JPGENCODER*)param;
-    AVFormatContext *fmt_ctxt   = NULL;
-    AVOutputFormat  *out_fmt    = NULL;
-    AVStream        *stream     = NULL;
-    AVCodecContext  *codec_ctxt = NULL;
-    AVCodec         *codec      = NULL;
-
-    AVPacket packet ;
-    int      got = 0;
-    int      ret = 0;
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-    JNIEnv *env = get_jni_env();
-#endif
-
-    // init packet
-    memset(&packet, 0, sizeof(AVPacket));
-
-    fmt_ctxt = avformat_alloc_context();
-    out_fmt  = av_guess_format("mjpeg", NULL, NULL);
-    fmt_ctxt->oformat = out_fmt;
-    if (avio_open(&fmt_ctxt->pb, encoder->file, AVIO_FLAG_READ_WRITE) < 0) {
-        printf("failed to open output file: %s !\n", encoder->file);
-        goto done;
-    }
-
-    stream = avformat_new_stream(fmt_ctxt, 0);
-    if (!stream) {
-        printf("failed to add stream !\n");
-        goto done;
-    }
-
-    codec_ctxt                = stream->codec;
-    codec_ctxt->codec_id      = out_fmt->video_codec;
-    codec_ctxt->codec_type    = AVMEDIA_TYPE_VIDEO;
-    codec_ctxt->pix_fmt       = AV_PIX_FMT_YUVJ420P;
-    codec_ctxt->width         = encoder->ow;
-    codec_ctxt->height        = encoder->oh;
-    codec_ctxt->time_base.num = 1;
-    codec_ctxt->time_base.den = 25;
-
-    codec = avcodec_find_encoder(codec_ctxt->codec_id);
-    if (!codec) {
-        printf("failed to find encoder !\n");
-        goto done;
-    }
-
-    if (avcodec_open2(codec_ctxt, codec, NULL) < 0) {
-        printf("failed to open encoder !\n");
-        goto done;
-    }
-
-    avcodec_encode_video2(codec_ctxt, &packet, &encoder->picture, &got);
-    if (got) {
-        ret = avformat_write_header(fmt_ctxt, NULL);
-        if (ret < 0) {
-            printf("error occurred when opening output file !\n");
-            goto done;
-        }
-        av_write_frame(fmt_ctxt, &packet);
-        av_write_trailer(fmt_ctxt);
-    }
-
-done:
-    if (codec_ctxt  ) avcodec_close(codec_ctxt);
-    if (fmt_ctxt->pb) avio_close(fmt_ctxt->pb);
-    if (fmt_ctxt    ) avformat_free_context(fmt_ctxt);
-    av_packet_unref(&packet);
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-    if (env && encoder->jcls_mr && encoder->jobj_mr && encoder->jmid_cb) {
-        env->CallVoidMethod(encoder->jobj_mr, encoder->jmid_cb, env->NewStringUTF(encoder->file), encoder->ow, encoder->oh);
-    }
-
-    // need call DetachCurrentThread
-    g_jvm->DetachCurrentThread();
-#endif
-
-    encoder->file = NULL;
     return NULL;
 }
 
@@ -794,11 +689,11 @@ void ffencoder_free(void *ctxt)
     free(encoder);
 }
 
-int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
+int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *aframe  = NULL;
-    uint8_t   *adatacur[8];
+    uint8_t   *adatacur[AV_NUM_DATA_POINTERS];
     int        sampnum, i;
     if (!ctxt) return -1;
 
@@ -847,7 +742,7 @@ int ffencoder_audio(void *ctxt, void *data[8], int nbsample)
     return 0;
 }
 
-int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
+int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *vframe  = NULL;
@@ -891,114 +786,4 @@ int ffencoder_video(void *ctxt, void *data[8], int linesize[8])
     sem_post(&encoder->vsemr);
     return 0;
 }
-
-void* ffencoder_jpeg_init(void)
-{
-    // allocate context for ffencoder
-    JPGENCODER *encoder = (JPGENCODER*)calloc(1, sizeof(JPGENCODER));
-    if (!encoder) {
-        return NULL;
-    }
-
-    // init variables
-    encoder->ofmt  = AV_PIX_FMT_YUV420P;
-    encoder->scale = SWS_FAST_BILINEAR ;
-
-    // init ffmpeg library
-    av_register_all();
-
-    return encoder;
-}
-
-int ffencoder_jpeg_save(void *ctxt, char *file, void *data[8], int linesize[8], int ifmt, int iw, int ih, int ow, int oh)
-{
-    JPGENCODER *encoder = (JPGENCODER*)ctxt;
-
-    // check valid
-    if (!ctxt) return -1;
-
-    // check encoder busy or not
-    if (encoder->file) {
-        return -1; // encoder busy
-    }
-    else {
-        encoder->file = file;
-    }
-
-    if (  ifmt != encoder->ifmt
-       || iw != encoder->iw || ih != encoder->ih
-       || ow != encoder->ow || oh != encoder->oh ) {
-
-        if (encoder->sws_ctx) {
-            sws_freeContext(encoder->sws_ctx);
-        }
-        encoder->sws_ctx = sws_getContext(iw, ih, (AVPixelFormat)ifmt,
-            ow, oh, encoder->ofmt, encoder->scale, NULL, NULL, NULL);
-        if (!encoder->sws_ctx) {
-            printf("could not initialize the conversion context jpg\n");
-            exit(1);
-        }
-
-        if (ow != encoder->ow || oh != encoder->oh) {
-            // free jpeg picture frame
-            av_frame_unref(&encoder->picture);
-
-            // alloc picture
-            alloc_picture(&encoder->picture, encoder->ofmt, ow, oh);
-        }
-
-        encoder->ow   = ow;
-        encoder->oh   = oh;
-        encoder->ifmt = (AVPixelFormat)ifmt;
-        encoder->iw   = iw;
-        encoder->ih   = ih;
-    }
-
-    // scale picture
-    sws_scale(
-        encoder->sws_ctx,
-        (const uint8_t * const *)data,
-        linesize,
-        0,
-        encoder->ih,
-        encoder->picture.data,
-        encoder->picture.linesize);
-
-    // create jpeg encoding thread
-    pthread_create(&encoder->thread_id, NULL, jpeg_encode_thread_proc, encoder);
-
-    return 0;
-}
-
-void ffencoder_jpeg_free(void *ctxt)
-{
-    JPGENCODER *encoder = (JPGENCODER*)ctxt;
-    if (!ctxt) return;
-
-    // wait jpeg encode thread exit
-    pthread_join(encoder->thread_id, NULL);
-
-    // free jpeg picture frame
-    av_frame_unref(&encoder->picture);
-
-    // free sws context
-    sws_freeContext(encoder->sws_ctx);
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-    get_jni_env()->DeleteGlobalRef(encoder->jobj_mr);
-#endif
-
-    free(ctxt);
-}
-
-#ifdef ENABLE_MEDIARECORDER_JNI
-void ffencoder_jpeg_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj)
-{
-    JPGENCODER *encoder = (JPGENCODER*)ctxt;
-    if (!encoder) return;
-    encoder->jcls_mr = env->GetObjectClass(obj);
-    encoder->jobj_mr = env->NewGlobalRef(obj);
-    encoder->jmid_cb = env->GetMethodID(encoder->jcls_mr, "internalTakePhotoCallback", "(Ljava/lang/String;II)V");
-}
-#endif
 

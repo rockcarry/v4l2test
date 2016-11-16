@@ -2,6 +2,7 @@
 #include <limits.h>
 #include "micdev.h"
 #include "camdev.h"
+#include "ffjpeg.h"
 #include "ffencoder.h"
 #include "ffrecorder.h"
 
@@ -86,7 +87,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 
 // 内部函数实现
 // micdev capture callback
-int micdev0_capture_callback_proc(void *r, void *data[8], int nbsample)
+static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int nbsample)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -104,7 +105,7 @@ int micdev0_capture_callback_proc(void *r, void *data[8], int nbsample)
 }
 
 // camdev capture callback
-int camdev0_capture_callback_proc(void *r, void *data[8], int linesize[8])
+static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -121,17 +122,19 @@ int camdev0_capture_callback_proc(void *r, void *data[8], int linesize[8])
 
     // use jpgenc to take photo
     if (recorder->take_photo_flags & (1 << 0)) {
-        printf("camdev0 take photo %s !\n", recorder->take_photo_file[0]);
-        ffencoder_jpeg_save(recorder->jpgenc, recorder->take_photo_file[0], data, linesize,
-            v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[0], CAMDEV_PARAM_VIDEO_PIXFMT)),
-            recorder->params.cam_frame_width_0, recorder->params.cam_frame_height_0,
-            recorder->params.cam_frame_width_0, recorder->params.cam_frame_height_0);
+        AVFrame frame;
+        frame.format = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[0], CAMDEV_PARAM_VIDEO_PIXFMT));
+        frame.width  = recorder->params.cam_frame_width_0 ;
+        frame.height = recorder->params.cam_frame_height_0;
+        memcpy(frame.data    , data    , sizeof(data    ));
+        memcpy(frame.linesize, linesize, sizeof(linesize));
+        ffjpeg_encoder_encode(recorder->jpgenc, recorder->take_photo_file[0], frame.width, frame.height, &frame);
         recorder->take_photo_flags &= ~(1 << 0);
     }
     return 0;
 }
 
-int camdev1_capture_callback_proc(void *r, void *data[8], int linesize[8])
+static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -148,10 +151,13 @@ int camdev1_capture_callback_proc(void *r, void *data[8], int linesize[8])
 
     // use jpgenc to take photo
     if (recorder->take_photo_flags & (1 << 1)) {
-        ffencoder_jpeg_save(recorder->jpgenc, recorder->take_photo_file[1], data, linesize,
-            v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[1], CAMDEV_PARAM_VIDEO_PIXFMT)),
-            recorder->params.cam_frame_width_1, recorder->params.cam_frame_height_1,
-            recorder->params.cam_frame_width_1, recorder->params.cam_frame_height_1);
+        AVFrame frame;
+        frame.format = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[1], CAMDEV_PARAM_VIDEO_PIXFMT));
+        frame.width  = recorder->params.cam_frame_width_1 ;
+        frame.height = recorder->params.cam_frame_height_1;
+        memcpy(frame.data    , data    , sizeof(data    ));
+        memcpy(frame.linesize, linesize, sizeof(linesize));
+        ffjpeg_encoder_encode(recorder->jpgenc, recorder->take_photo_file[1], frame.width, frame.height, &frame);
         recorder->take_photo_flags &= ~(1 << 1);
     }
     return 0;
@@ -226,7 +232,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
         printf("failed to init camdev1 !\n");
     }
 
-    recorder->jpgenc = ffencoder_jpeg_init();
+    recorder->jpgenc = ffjpeg_encoder_init();
     if (!recorder->jpgenc) {
         printf("failed to init jpgenc !\n");
     }
@@ -264,7 +270,7 @@ void ffrecorder_free(void *ctxt)
     camdev_close(recorder->camdev[1]);
 
     // free jpg encoder
-    ffencoder_jpeg_free(recorder->jpgenc);
+    ffjpeg_encoder_free(recorder->jpgenc);
 
     // free context
     free(recorder);
@@ -489,7 +495,7 @@ void ffrecorder_init_jni_callback(void *ctxt, JNIEnv *env, jobject obj)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
     if (!recorder) return;
-    ffencoder_jpeg_init_jni_callback(recorder->jpgenc, env, obj);
+    ffjpeg_encoder_init_jni_callback(recorder->jpgenc, env, obj);
 }
 #endif
 
