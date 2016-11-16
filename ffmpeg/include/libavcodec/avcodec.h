@@ -4178,7 +4178,7 @@ const AVClass *avcodec_get_subtitle_rect_class(void);
  * avcodec_parameters_from_context() / avcodec_parameters_to_context()
  * functions.
  */
-attribute_deprecated
+// attribute_deprecated
 int avcodec_copy_context(AVCodecContext *dest, const AVCodecContext *src);
 #endif
 
@@ -4700,7 +4700,7 @@ enum AVChromaLocation avcodec_chroma_pos_to_enum(int xpos, int ypos);
  *
 * @deprecated Use avcodec_send_packet() and avcodec_receive_frame().
  */
-attribute_deprecated
+// attribute_deprecated
 int avcodec_decode_audio4(AVCodecContext *avctx, AVFrame *frame,
                           int *got_frame_ptr, const AVPacket *avpkt);
 
@@ -4749,7 +4749,7 @@ int avcodec_decode_audio4(AVCodecContext *avctx, AVFrame *frame,
  *
  * @deprecated Use avcodec_send_packet() and avcodec_receive_frame().
  */
-attribute_deprecated
+// attribute_deprecated
 int avcodec_decode_video2(AVCodecContext *avctx, AVFrame *picture,
                          int *got_picture_ptr,
                          const AVPacket *avpkt);
@@ -5218,7 +5218,7 @@ AVCodec *avcodec_find_encoder_by_name(const char *name);
  *
  * @deprecated use avcodec_send_frame()/avcodec_receive_packet() instead
  */
-attribute_deprecated
+// attribute_deprecated
 int avcodec_encode_audio2(AVCodecContext *avctx, AVPacket *avpkt,
                           const AVFrame *frame, int *got_packet_ptr);
 
@@ -5257,7 +5257,7 @@ int avcodec_encode_audio2(AVCodecContext *avctx, AVPacket *avpkt,
  *
  * @deprecated use avcodec_send_frame()/avcodec_receive_packet() instead
  */
-attribute_deprecated
+// attribute_deprecated
 int avcodec_encode_video2(AVCodecContext *avctx, AVPacket *avpkt,
                           const AVFrame *frame, int *got_packet_ptr);
 

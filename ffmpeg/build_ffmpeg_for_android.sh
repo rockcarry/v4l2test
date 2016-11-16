@@ -24,7 +24,7 @@ export LD="${CROSS_COMPILE}ld"
 export STRIP="${CROSS_COMPILE}strip"
 export AR="${CROSS_COMPILE}ar"
 cd faac-1.28
-./configure --prefix=$PWD/.. \
+./configure --prefix=$PWD/../ffmpeg-android-sdk \
 --host=arm-linux \
 --enable-static \
 --enable-shared \
@@ -60,7 +60,7 @@ cd ffmpeg
 --target-os=android \
 --enable-cross-compile \
 --cross-prefix=arm-linux-androideabi- \
---prefix=$PWD/.. \
+--prefix=$PWD/../ffmpeg-android-sdk \
 --enable-thumb \
 --enable-static \
 --enable-shared \
@@ -76,9 +76,9 @@ cd ffmpeg
 --enable-encoder=libx264 \
 --enable-encoder=aac \
 --enable-encoder=mjpeg \
+--enable-decoder=mjpeg \
 --enable-muxer=flv \
 --enable-muxer=mp4 \
---enable-muxer=mjpeg \
 --enable-protocol=file \
 --enable-protocol=rtmp \
 --disable-swscale-alpha \
