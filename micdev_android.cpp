@@ -6,7 +6,6 @@
 #include <pthread.h>
 #include <utils/Log.h>
 #include "micdev.h"
-#include "micdev_android.h"
 
 // 内部常量定义
 #define ENCODING_INVALID                0

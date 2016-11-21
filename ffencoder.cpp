@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "ffutils.h"
 #include "ffencoder.h"
 
 extern "C" {
@@ -63,7 +64,6 @@ typedef struct
     AVFrame           *aframes;
     int64_t            next_apts;
     AVFrame           *aframecur;
-    AVFrame            aframetmp;
     int                asampavail;
     sem_t              asemr;
     sem_t              asemw;
@@ -72,7 +72,6 @@ typedef struct
 
     AVStream          *vstream;
     AVFrame           *vframes;
-    int64_t            next_vpts;
     sem_t              vsemr;
     sem_t              vsemw;
     int                vhead;
@@ -82,7 +81,6 @@ typedef struct
     AVFormatContext   *ofctxt;
     AVCodec           *acodec;
     AVCodec           *vcodec;
-    AVDictionary      *avopt;
 
     int                have_audio;
     int                have_video;
@@ -92,6 +90,8 @@ typedef struct
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
     pthread_mutex_t    mutex;
+
+    uint64_t           start_tick;
 } FFENCODER;
 
 // 内部全局变量定义
@@ -105,6 +105,7 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     480,                        // in_video_height
     AV_PIX_FMT_YUYV422,         // in_video_pixfmt
     30,                         // in_video_frame_rate
+    0,                          // in_video_encoded
 
     // output params
     (char*)"/sdcard/test.mp4",  // filename
@@ -215,11 +216,10 @@ static void* video_encode_thread_proc(void *param)
         vframe = &encoder->vframes[encoder->vhead];
 
         // encode & write video
-        if (encoder->ofctxt->oformat->flags & AVFMT_RAWPICTURE) {
-            /* a hack to avoid data copy with some raw video muxers */
+        if (encoder->params.in_video_encoded) {
             pkt.flags |= AV_PKT_FLAG_KEY;
-            pkt.data   = (uint8_t*)vframe;
-            pkt.size   = sizeof(AVPicture);
+            pkt.data   = vframe->data[0];
+            pkt.size   = vframe->pkt_size;
             pkt.pts    = vframe->pts;
             pkt.dts    = vframe->pts;
             write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
@@ -345,7 +345,7 @@ static int add_vstream(FFENCODER *encoder)
      * timebase should be 1/framerate and timestamp increments should be
      * identical to 1. */
     encoder->vstream->time_base.num = 1;
-    encoder->vstream->time_base.den = encoder->params.out_video_frame_rate;
+    encoder->vstream->time_base.den = 1000;
     c->time_base = encoder->vstream->time_base;
     c->gop_size  = 12; /* emit one intra frame every twelve frames at most */
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
@@ -358,6 +358,9 @@ static int add_vstream(FFENCODER *encoder)
          * This does not happen with normal video, it just happens here as
          * the motion of the chroma plane does not match the luma plane. */
         c->mb_decision = 2;
+    }
+    if (c->codec_id == AV_CODEC_ID_MJPEG) {
+        c->pix_fmt = AV_PIX_FMT_YUVJ420P;
     }
 
     /* some formats want stream headers to be separate. */
@@ -389,18 +392,14 @@ static void alloc_audio_frame(AVFrame *frame, enum AVSampleFormat sample_fmt, ui
 static void open_audio(FFENCODER *encoder)
 {
     AVCodec        *codec     = encoder->acodec;
-    AVDictionary   *opt_arg   = encoder->avopt;
     AVCodecContext *c         = encoder->astream->codec;
-    AVDictionary   *opt       = NULL;
     int             in_layout = encoder->params.in_audio_channel_layout;
     AVSampleFormat  in_sfmt   = (AVSampleFormat)encoder->params.in_audio_sample_fmt;
     int             in_rate   = encoder->params.in_audio_sample_rate;
     int             i, ret;
 
     /* open it */
-    av_dict_copy(&opt, opt_arg, 0);
-    ret = avcodec_open2(c, codec, &opt);
-    av_dict_free(&opt);
+    ret = avcodec_open2(c, codec, NULL);
     if (ret < 0) {
         printf("could not open audio codec !\n");
         exit(1);
@@ -435,9 +434,6 @@ static void open_audio(FFENCODER *encoder)
             c->frame_size);
     }
 
-    // allocate temp audio frame
-    alloc_audio_frame(&encoder->aframetmp, c->sample_fmt, c->channel_layout, c->sample_rate, c->frame_size);
-
     sem_init(&encoder->asemr, 0, 0                                  );
     sem_init(&encoder->asemw, 0, encoder->params.audio_buffer_number);
 
@@ -464,16 +460,16 @@ static void alloc_picture(AVFrame *picture, enum AVPixelFormat pix_fmt, int widt
 static void open_video(FFENCODER *encoder)
 {
     AVCodec        *codec   = encoder->vcodec;
-    AVDictionary   *opt_arg = encoder->avopt;
     AVCodecContext *c       = encoder->vstream->codec;
-    AVDictionary   *opt     = NULL;
+    AVDictionary   *param   = NULL;
     int             i, ret;
 
-    av_dict_copy(&opt, opt_arg, 0);
+    if (c->codec_id == AV_CODEC_ID_H264) {
+        av_dict_set(&param, "preset", "fast", 0);
+    }
 
     /* open the codec */
-    ret = avcodec_open2(c, codec, &opt);
-    av_dict_free(&opt);
+    ret = avcodec_open2(c, codec, &param);
     if (ret < 0) {
         printf("could not open video codec !\n");
         exit(1);
@@ -499,8 +495,17 @@ static void open_video(FFENCODER *encoder)
         exit(1);
     }
 
-    for (i=0; i<encoder->params.video_buffer_number; i++) {
-        alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
+    if (encoder->params.in_video_encoded) {
+        //++ for encoded video data input, we allocate large enough vframes
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            alloc_picture(&encoder->vframes[i], AV_PIX_FMT_RGB24, c->width, c->height);
+        }
+        //-- for encoded video data input, we allocate large enough vframes
+    }
+    else {
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
+        }
     }
 
     sem_init(&encoder->vsemr, 0, 0                                  );
@@ -520,15 +525,12 @@ static void close_astream(FFENCODER *encoder)
     sem_destroy(&encoder->asemr);
     sem_destroy(&encoder->asemw);
 
-    //++ for audio frames
+    //+ free audio frames
     for (i=0; i<encoder->params.audio_buffer_number; i++) {
         av_frame_unref(&encoder->aframes[i]);
     }
     free(encoder->aframes);
-    //-- for audio frames
-
-    // free temp audio frame
-    av_frame_unref(&encoder->aframetmp);
+    //- free audio frames
 
     avcodec_close(encoder->astream->codec);
     swr_free(&encoder->swr_ctx);
@@ -544,12 +546,12 @@ static void close_vstream(FFENCODER *encoder)
     sem_destroy(&encoder->vsemr);
     sem_destroy(&encoder->vsemw);
 
-    //++ for video frames
+    //+ free video frames
     for (i=0; i<encoder->params.video_buffer_number; i++) {
         av_frame_unref(&encoder->vframes[i]);
     }
     free(encoder->vframes);
-    //-- for video frames
+    //- free video frames
 
     avcodec_close(encoder->vstream->codec);
     sws_freeContext(encoder->sws_ctx);
@@ -576,6 +578,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->in_video_height         ) params->in_video_height         = DEF_FFENCODER_PARAMS.in_video_height;
     if (!params->in_video_pixfmt         ) params->in_video_pixfmt         = DEF_FFENCODER_PARAMS.in_video_pixfmt;
     if (!params->in_video_frame_rate     ) params->in_video_frame_rate     = DEF_FFENCODER_PARAMS.in_video_frame_rate;
+    if (!params->in_video_encoded        ) params->in_video_encoded        = DEF_FFENCODER_PARAMS.in_video_encoded;
     if (!params->out_filename            ) params->out_filename            = DEF_FFENCODER_PARAMS.out_filename;
     if (!params->out_audio_bitrate       ) params->out_audio_bitrate       = DEF_FFENCODER_PARAMS.out_audio_bitrate;
     if (!params->out_audio_channel_layout) params->out_audio_channel_layout= DEF_FFENCODER_PARAMS.out_audio_channel_layout;
@@ -591,7 +594,6 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
     memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
     encoder->next_apts = params->start_apts;
-    encoder->next_vpts = params->start_vpts;
 
     /* initialize libavcodec, and register all codecs and formats. */
     av_register_all();
@@ -611,6 +613,12 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         encoder->ofctxt->oformat->audio_codec = AV_CODEC_ID_AAC;
         encoder->ofctxt->oformat->video_codec = AV_CODEC_ID_H264;
     }
+
+    //++ for encodec video input data
+    if (encoder->params.in_video_encoded) {
+        encoder->ofctxt->oformat->video_codec = (AVCodecID)encoder->params.in_video_encoded;
+    }
+    //-- for encodec video input data
 
     /* add the audio and video streams using the default format codecs
      * and initialize the codecs. */
@@ -644,7 +652,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     }
 
     /* write the stream header, if any. */
-    ret = avformat_write_header(encoder->ofctxt, &encoder->avopt);
+    ret = avformat_write_header(encoder->ofctxt, NULL);
     if (ret < 0) {
         printf("error occurred when opening output file !\n");
         goto failed;
@@ -692,7 +700,6 @@ void ffencoder_free(void *ctxt)
 int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
-    AVFrame   *aframe  = NULL;
     uint8_t   *adatacur[AV_NUM_DATA_POINTERS];
     int        sampnum, i;
     if (!ctxt) return -1;
@@ -702,25 +709,17 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
         if (encoder->asampavail == 0) {
             if (0 != sem_trywait(&encoder->asemw)) {
 //              printf("audio frame dropped by encoder !\n");
-                do {
-                    sampnum  = swr_convert(encoder->swr_ctx,
-                        (uint8_t**)encoder->aframetmp.data, encoder->aframetmp.nb_samples,
-                        (const uint8_t**)data, nbsample);
-                    data     = NULL;
-                    nbsample = 0;
-                    encoder->next_apts += sampnum;
-                } while (sampnum > 0);
                 return -1;
             }
             encoder->aframecur  = &encoder->aframes[encoder->atail];
             encoder->asampavail =  encoder->aframes[encoder->atail].nb_samples;
         }
 
-        aframe = encoder->aframecur;
         for (i=0; i<8; i++) {
-            adatacur[i] = aframe->data[i] + (aframe->nb_samples - encoder->asampavail)
-                                          * av_get_bytes_per_sample(encoder->astream->codec->sample_fmt) 
-                                          * encoder->astream->codec->channels;
+            adatacur[i] = encoder->aframecur->data[i]
+                        + (encoder->aframecur->nb_samples - encoder->asampavail)
+                            * av_get_bytes_per_sample(encoder->astream->codec->sample_fmt) 
+                            * encoder->astream->codec->channels;
         }
 
         sampnum  = swr_convert(encoder->swr_ctx, adatacur, encoder->asampavail, (const uint8_t**)data, nbsample);
@@ -729,8 +728,8 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
         encoder->asampavail -= sampnum;
 
         if (encoder->asampavail == 0) {
-            aframe->pts         = encoder->next_apts;
-            encoder->next_apts += aframe->nb_samples;
+            encoder->aframecur->pts  = encoder->next_apts;
+            encoder->next_apts      += encoder->aframecur->nb_samples;
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
                 encoder->atail = 0;
@@ -749,12 +748,7 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
     int        drop    = 0;
     if (!ctxt) return -1;
 
-    int64_t apts = av_rescale_q(encoder->next_apts, encoder->astream->codec->time_base, (AVRational){1,1000});
-    int64_t vpts = av_rescale_q(encoder->next_vpts, encoder->vstream->codec->time_base, (AVRational){1,1000});
-
     drop = !frame_dropper_clocked(&encoder->vdropper);
-    if (vpts - apts > 100) drop = 1;
-    if (apts - vpts > 100) drop = 0;
     if (drop) {
 //      printf("frame dropped by frame dropper !\n");
         return 0;
@@ -762,22 +756,37 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 
     if (0 != sem_trywait(&encoder->vsemw)) {
 //      printf("video frame dropped by encoder !\n");
-        encoder->next_vpts++;
         return -1;
     }
 
-    vframe = &encoder->vframes[encoder->vtail];
+    // start_tick
+    if (!encoder->start_tick) encoder->start_tick = get_tick_count();
 
-    // scale video image
-    sws_scale(
-        encoder->sws_ctx,
-        (const uint8_t * const *)data,
-        linesize,
-        0,
-        encoder->params.in_video_height,
-        vframe->data,
-        vframe->linesize);
-    vframe->pts = encoder->next_vpts++;
+    // vframe pts
+    vframe      = &encoder->vframes[encoder->vtail];
+    vframe->pts = encoder->params.start_vpts + (get_tick_count() - encoder->start_tick);
+
+    if (encoder->params.in_video_encoded) {
+        // for encoded data, data[0] stored buffer addr, data[1] stored buffer size
+        uint8_t *srcbuf = (uint8_t*)data[0];
+        int      srclen = (int     )data[1];
+        uint8_t *dstbuf = (uint8_t*)vframe->data[0];
+        int      dstlen = vframe->linesize[0] * vframe->height;
+        int      cpylen = dstlen < srclen ? dstlen : srclen;
+        memcpy(dstbuf, srcbuf, cpylen);
+        vframe->pkt_size = cpylen;
+    }
+    else {
+        // scale video image
+        sws_scale(
+            encoder->sws_ctx,
+            (const uint8_t * const *)data,
+            linesize,
+            0,
+            encoder->params.in_video_height,
+            vframe->data,
+            vframe->linesize);
+    }
 
     if (++encoder->vtail == encoder->params.video_buffer_number) {
         encoder->vtail = 0;

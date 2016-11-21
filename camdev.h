@@ -34,9 +34,6 @@ void  camdev_set_callback (void *ctxt, void *callback, void *recorder);
 void  camdev_set_param    (void *ctxt, int id, int value);
 int   camdev_get_param    (void *ctxt, int id);
 
-int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt);
-int android_pixfmt_to_ffmpeg_pixfmt(int srcfmt);
-
 #endif
 
 

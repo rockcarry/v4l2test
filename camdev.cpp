@@ -5,9 +5,8 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <linux/videodev2.h>
 #include <utils/Log.h>
-#include "ffencoder.h"
+#include "ffutils.h"
 #include "ffjpeg.h"
 #include "camdev.h"
 
@@ -59,18 +58,6 @@ typedef struct {
 } CAMDEV;
 
 // 内部函数实现
-static int ALIGN(int x, int y) {
-    // y must be a power of 2.
-    return (x + y - 1) & ~(y - 1);
-}
-
-static uint64_t get_tick_count(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
-}
-
 static void render_v4l2(CAMDEV *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dstw, int dsth,
                         void *srcbuf, int srclen, int srcfmt, int srcw, int srch, int pts)
@@ -229,6 +216,10 @@ static void* camdev_capture_thread_proc(void *param)
             int      linesize[AV_NUM_DATA_POINTERS] = { camw, camw / 1, camw / 1 };
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
+            }
+            if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
+                // for mjpeg camera, data[0] store buffer addr, data[1] store buffer size
+                data[1] = (void*)cam->buf.bytesused;
             }
             cam->callback(cam->recorder, data, linesize);
         }
@@ -556,28 +547,5 @@ int camdev_get_param(void *ctxt, int id)
     return 0;
 }
 
-int v4l2dev_pixfmt_to_ffmpeg_pixfmt(int srcfmt)
-{
-    // src fmt
-    int dst_fmt = AV_PIX_FMT_NONE;
-    switch (srcfmt) {
-    case V4L2_PIX_FMT_YUYV: dst_fmt = AV_PIX_FMT_YUYV422; break;
-    case V4L2_PIX_FMT_NV12: dst_fmt = AV_PIX_FMT_NV12;    break;
-    case V4L2_PIX_FMT_NV21: dst_fmt = AV_PIX_FMT_NV21;    break;
-    }
-    return dst_fmt;
-}
 
-int android_pixfmt_to_ffmpeg_pixfmt(int srcfmt)
-{
-    // dst fmt
-    int dst_fmt = AV_PIX_FMT_NONE;
-    switch (srcfmt) {
-    case HAL_PIXEL_FORMAT_RGB_565:      dst_fmt = AV_PIX_FMT_RGB565;  break;
-    case HAL_PIXEL_FORMAT_RGBX_8888:    dst_fmt = AV_PIX_FMT_BGR32;   break;
-    case HAL_PIXEL_FORMAT_YV12:         dst_fmt = AV_PIX_FMT_YUV420P; break;
-    case HAL_PIXEL_FORMAT_YCrCb_420_SP: dst_fmt = AV_PIX_FMT_NV21;    break;
-    }
-    return dst_fmt;
-}
 

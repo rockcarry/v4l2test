@@ -6,7 +6,6 @@
 #include <tinyalsa/asoundlib.h>
 #include <utils/Log.h>
 #include "micdev.h"
-#include "micdev_tinyalsa.h"
 
 // 内部类型定义
 // micdev context

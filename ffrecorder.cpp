@@ -2,6 +2,7 @@
 #include <limits.h>
 #include "micdev.h"
 #include "camdev.h"
+#include "ffutils.h"
 #include "ffjpeg.h"
 #include "ffencoder.h"
 #include "ffrecorder.h"
@@ -61,19 +62,19 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     16000,                      // out_audio_bitrate_0
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_0
     16000,                      // out_audio_samprate_0
-    384000,                     // out_video_bitrate_0
+    640000,                     // out_video_bitrate_0
     320,                        // out_video_width_0
-    200,                        // out_video_height_0
-    15,                         // out_video_frate_0
+    240,                        // out_video_height_0
+    25,                         // out_video_frate_0
 
     // ffencoder output
     16000,                      // out_audio_bitrate_1
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_1
     16000,                      // out_audio_samprate_1
-    384000,                     // out_video_bitrate_1
-    320,                        // out_video_width_1
-    200,                        // out_video_height_1
-    15,                         // out_video_frate_1
+    2000000,                    // out_video_bitrate_1
+    640,                        // out_video_width_1
+    480,                        // out_video_height_1
+    25,                         // out_video_frate_1
 
     // ffencoder output
     16000,                      // out_audio_bitrate_2
@@ -422,6 +423,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.in_video_height         = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_HEIGHT);
     encoder_params.in_video_pixfmt         = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT));
     encoder_params.in_video_frame_rate     = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE );
+    encoder_params.in_video_encoded        = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? AV_CODEC_ID_MJPEG : 0;
     encoder_params.out_filename            = filename;
     encoder_params.out_audio_bitrate       = abitrate;
     encoder_params.out_audio_channel_layout= achlayout;
