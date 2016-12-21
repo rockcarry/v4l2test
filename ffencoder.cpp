@@ -610,11 +610,11 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         encoder->ofctxt->oformat->video_codec = AV_CODEC_ID_H264;
     }
 
-    //++ for encodec video input data
+    //++ for encoded video input data
     if (encoder->params.in_video_encoded) {
         encoder->ofctxt->oformat->video_codec = (AVCodecID)encoder->params.in_video_encoded;
     }
-    //-- for encodec video input data
+    //-- for encoded video input data
 
     /* add the audio and video streams using the default format codecs
      * and initialize the codecs. */
@@ -691,6 +691,9 @@ void ffencoder_free(void *ctxt)
 
     // free encoder context
     free(encoder);
+
+    // deinit network
+    avformat_network_deinit();
 }
 
 int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts)
@@ -756,6 +759,7 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 
     if (0 != sem_trywait(&encoder->vsemw)) {
 //      printf("video frame dropped by encoder !\n");
+        encoder->next_vpts++;
         return -1;
     }
 
