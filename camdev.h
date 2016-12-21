@@ -12,7 +12,7 @@ using namespace android;
 
 // 类型定义
 // camdev capture callback
-typedef int (*CAMDEV_CAPTURE_CALLBACK)(void *recorder, void *data[8], int linesize[8]);
+typedef int (*CAMDEV_CAPTURE_CALLBACK)(void *recorder, void *data[8], int linesize[8], int pts);
 
 enum {
     CAMDEV_PARAM_VIDEO_WIDTH,

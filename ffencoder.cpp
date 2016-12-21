@@ -72,6 +72,7 @@ typedef struct
 
     AVStream          *vstream;
     AVFrame           *vframes;
+    int64_t            next_vpts;
     sem_t              vsemr;
     sem_t              vsemw;
     int                vhead;
@@ -90,8 +91,6 @@ typedef struct
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
     pthread_mutex_t    mutex;
-
-    uint64_t           start_tick;
 } FFENCODER;
 
 // 内部全局变量定义
@@ -118,11 +117,10 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     20,                         // out_video_frame_rate
 
     // other params
-    0,                          // start_apts
-    0,                          // start_vpts
     SWS_FAST_BILINEAR,          // scale_flags
     8,                          // audio_buffer_number
     3,                          // video_buffer_number
+    0,                          // video_timebase_type
 };
 
 // 内部函数实现
@@ -345,7 +343,7 @@ static int add_vstream(FFENCODER *encoder)
      * timebase should be 1/framerate and timestamp increments should be
      * identical to 1. */
     encoder->vstream->time_base.num = 1;
-    encoder->vstream->time_base.den = 1000;
+    encoder->vstream->time_base.den = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate : 1000;
     c->time_base = encoder->vstream->time_base;
     c->gop_size  = 12; /* emit one intra frame every twelve frames at most */
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
@@ -587,13 +585,11 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->out_video_width         ) params->out_video_width         = DEF_FFENCODER_PARAMS.out_video_width;
     if (!params->out_video_height        ) params->out_video_height        = DEF_FFENCODER_PARAMS.out_video_height;
     if (!params->out_video_frame_rate    ) params->out_video_frame_rate    = DEF_FFENCODER_PARAMS.out_video_frame_rate;
-    if (!params->start_apts              ) params->start_apts              = DEF_FFENCODER_PARAMS.start_apts;
-    if (!params->start_vpts              ) params->start_vpts              = DEF_FFENCODER_PARAMS.start_vpts;
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
     if (!params->audio_buffer_number     ) params->audio_buffer_number     = DEF_FFENCODER_PARAMS.audio_buffer_number;
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
+    if (!params->video_timebase_type     ) params->video_timebase_type     = DEF_FFENCODER_PARAMS.video_timebase_type;
     memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
-    encoder->next_apts = params->start_apts;
 
     /* initialize libavcodec, and register all codecs and formats. */
     av_register_all();
@@ -697,7 +693,7 @@ void ffencoder_free(void *ctxt)
     free(encoder);
 }
 
-int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
+int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     uint8_t   *adatacur[AV_NUM_DATA_POINTERS];
@@ -728,8 +724,12 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
         encoder->asampavail -= sampnum;
 
         if (encoder->asampavail == 0) {
-            encoder->aframecur->pts  = encoder->next_apts;
-            encoder->next_apts      += encoder->aframecur->nb_samples;
+            if (pts == -1) {
+                encoder->aframecur->pts = encoder->next_apts;
+                encoder->next_apts     += encoder->aframecur->nb_samples;
+            } else {
+                encoder->aframecur->pts = pts;
+            }
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
                 encoder->atail = 0;
@@ -741,7 +741,7 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample)
     return 0;
 }
 
-int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
+int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *vframe  = NULL;
@@ -759,12 +759,13 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
         return -1;
     }
 
-    // start_tick
-    if (!encoder->start_tick) encoder->start_tick = get_tick_count();
-
     // vframe pts
-    vframe      = &encoder->vframes[encoder->vtail];
-    vframe->pts = encoder->params.start_vpts + (get_tick_count() - encoder->start_tick);
+    vframe = &encoder->vframes[encoder->vtail];
+    if (pts == -1) {
+        vframe->pts = encoder->next_vpts++;
+    } else {
+        vframe->pts = pts;
+    }
 
     if (encoder->params.in_video_encoded) {
         // for encoded data, data[0] stored buffer addr, data[1] stored buffer size

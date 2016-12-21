@@ -53,11 +53,10 @@ int main(void)
         25,                        // out_video_frame_rate
 
         // other params
-        0,                         // start_apts
-        0,                         // start_vpts
         SWS_POINT,                 // scale_flags
         5,                         // audio_buffer_number
         5,                         // video_buffer_number
+        1,                         // timebase by frame rate
     };
     encoder = ffencoder_init(&param);
 
@@ -65,8 +64,8 @@ int main(void)
     {
         rand_buf(abuf, sizeof(abuf));
         rand_buf(vbuf, sizeof(vbuf));
-        ffencoder_audio(encoder, adata, 44100/30);
-        ffencoder_video(encoder, vdata, linesize);
+        ffencoder_audio(encoder, adata, 44100/30, -1);
+        ffencoder_video(encoder, vdata, linesize, -1);
     }
 
     jpegenc = ffjpeg_encoder_init();

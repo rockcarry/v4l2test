@@ -183,6 +183,8 @@ static void* camdev_capture_thread_proc(void *param)
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
 //              cam->buf.sequence, cam->buf.length);
+//      ALOGD("timestamp: %ld, %ld\n", cam->buf.timestamp.tv_sec, cam->buf.timestamp.tv_usec);
+
         if (cam->thread_state & CAMDEV_TS_PREVIEW)
         {
             int   pts  = (int)(cam->buf.timestamp.tv_usec + cam->buf.timestamp.tv_sec * 1000000);
@@ -214,6 +216,7 @@ static void* camdev_capture_thread_proc(void *param)
             uint8_t *cbuf = (uint8_t*)cam->vbs[cam->buf.index].addr;
             void    *data[AV_NUM_DATA_POINTERS]     = { (uint8_t*)cbuf, (uint8_t*)cbuf + camw * camh, (uint8_t*)cbuf + camw * camh };
             int      linesize[AV_NUM_DATA_POINTERS] = { camw, camw / 1, camw / 1 };
+            int      pts  = (int)(cam->buf.timestamp.tv_sec * 1000 + cam->buf.timestamp.tv_usec / 1000);
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
             }
@@ -221,7 +224,7 @@ static void* camdev_capture_thread_proc(void *param)
                 // for mjpeg camera, data[0] store buffer addr, data[1] store buffer size
                 data[1] = (void*)cam->buf.bytesused;
             }
-            cam->callback(cam->recorder, data, linesize);
+            cam->callback(cam->recorder, data, linesize, pts);
         }
 
         // requeue camera video buffer

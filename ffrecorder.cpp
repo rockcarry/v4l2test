@@ -17,6 +17,7 @@ typedef struct
     FFRECORDER_PARAMS params;
     void             *micdev [MAX_MICDEV_NUM ];
     void             *camdev [MAX_CAMDEV_NUM ];
+    int               rsvpts [MAX_CAMDEV_NUM ];
     void             *encoder[MAX_ENCODER_NUM];
     void             *enclose[MAX_ENCODER_NUM];
     #define FRF_RECORDING   (1 << 1 )
@@ -97,7 +98,7 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
         }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->audio_source[i] == 0) {
-                ffencoder_audio(recorder->encoder[i], data, nbsample);
+                ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
             }
         }
         recorder->state &= ~FRF_RECORD_MACK;
@@ -106,7 +107,7 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 }
 
 // camdev capture callback
-static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
+static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -115,7 +116,13 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
         }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 0) {
-                ffencoder_video(recorder->encoder[i], data, linesize);
+                if (recorder->rsvpts[0] == -1) {
+                    recorder->rsvpts[0] = pts;
+                    pts  = 0;
+                } else {
+                    pts -= recorder->rsvpts[0];
+                }
+                ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
         recorder->state &= ~FRF_RECORD_CACK;
@@ -135,7 +142,7 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
     return 0;
 }
 
-static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS])
+static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -144,7 +151,13 @@ static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
         }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 1) {
-                ffencoder_video(recorder->encoder[i], data, linesize);
+                if (recorder->rsvpts[1] == -1) {
+                    recorder->rsvpts[1] = pts;
+                    pts  = 0;
+                } else {
+                    pts -= recorder->rsvpts[1];
+                }
+                ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
         recorder->state &= ~FRF_RECORD_CACK;
@@ -432,16 +445,18 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.out_video_width         = vwidth;
     encoder_params.out_video_height        = vheight;
     encoder_params.out_video_frame_rate    = vfrate;
-    encoder_params.start_apts              = 0;
-    encoder_params.start_vpts              = 0;
     encoder_params.scale_flags             = 0; // use default
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
+    encoder_params.video_timebase_type     = 0; // timebase by ms
     recorder->enclose[encidx] = recorder->encoder[encidx];
     recorder->encoder[encidx] = ffencoder_init(&encoder_params);
     if (!recorder->encoder[encidx]) {
         printf("failed to init encoder !\n");
     }
+
+    // reset record start vpts
+    recorder->rsvpts[vidsrc] = -1;
 
     // set request recording flag and wait switch done
     recorder->state |= (FRF_RECORD_REQ|FRF_RECORDING);
