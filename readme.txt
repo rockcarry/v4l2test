@@ -31,6 +31,8 @@ How to build
 ============
 1. using build_ffmpeg_for_android.sh to build ffmpeg library.
 2. using NDK or android build environment to build test program
+   (I built these codes under AllWinner A33 Android 4.4 source code enviroment.
+    So I suggest using NDK version corresponding to Android 4.4.)
 
 
 Features
@@ -48,20 +50,54 @@ Features
 12. support push rtmp/hls live stream
 
 
+How to use
+==========
+after build success, you will get v4l2test, encodertest, recordertest and libffrecorder_jni.
+
+v4l2test
+--------
+push it to /system/bin/ (using adb), chmod 755.
+in adb shell, try command:
+v4l2test /dev/video0 0 640 480
+/dev/video0 - video device file name
+0           - video device sub source
+           (for some platform front and rear camera both share using /dev/video0,
+            but use different source, maybe 0 - rear camera, 1 - front camera)
+640 480     - camera preview resolution.
+if success, the camera preview will be displayed on screen
+
+encodertest
+-----------
+try command:
+encodertest
+it will generate random video and audio data, and encode into mp4 file.
+
+recordertest
+------------
+try command:
+recordertest
+it will capture video from camera, audio from mic, and encode into mp4 file.
+
+libffrecorder_jni
+-----------------
+it is a jni library for MediaRecorder.java class file.
+by libffrecorder_jni and MediaRecorder.java, you are able to use v4l2test for android apk development with java code.
+an other related project is CameraDVR: https://github.com/rockcarry/CameraDVR
+
+
 TODO
 ====
 1.  implments hardware encoding for A33 platfrom
     plan to write a hardware H264 encoding ffmpeg codec for A33 platform
 
-2.  stability and performance
+2.  implments hardware encoding using jni access to android MediaCodec java class library
+
+3.  stability and performance
 
 
 
 rockcarry
-2016-6-22
-
-
-
+2017-2-10
 
 
 
