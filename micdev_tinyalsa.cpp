@@ -1,4 +1,4 @@
-﻿#define LOG_TAG "camdev"
+﻿#define LOG_TAG "micdev"
 
 // 包含头文件
 #include <stdlib.h>
