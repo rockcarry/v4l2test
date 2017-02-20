@@ -38,6 +38,7 @@ typedef struct
     int   audio_buffer_number;
     int   video_buffer_number;
     int   video_timebase_type; // 1 - by frame rate, 0 - by ms
+    int   video_encoder_type;  // 1 - hw h264, 0 - x264
 } FFENCODER_PARAMS;
 
 // º¯ÊıÉùÃ÷

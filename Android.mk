@@ -93,8 +93,8 @@ LOCAL_C_INCLUDES := external/tinyalsa/include
 
 LOCAL_SRC_FILES := \
     micdev_tinyalsa.cpp \
-    ffjpeg.cpp \
     camdev.cpp \
+    ffjpeg.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \
     recordertest.cpp
@@ -136,12 +136,14 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += \
     -DUSE_MICDEV_ANDROID \
-    -DENABLE_MEDIARECORDER_JNI
+    -DENABLE_MEDIARECORDER_JNI \
+    -DENABLE_H264_HWENC
 
 LOCAL_SRC_FILES := \
+    h264hwenc.cpp \
     micdev_android.cpp \
-    ffjpeg.cpp \
     camdev.cpp \
+    ffjpeg.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \
     com_apical_dvr_MediaRecorder.cpp

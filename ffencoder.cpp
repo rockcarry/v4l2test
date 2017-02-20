@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "h264hwenc.h"
 #include "ffutils.h"
 #include "ffencoder.h"
 
@@ -82,6 +83,7 @@ typedef struct
     AVFormatContext   *ofctxt;
     AVCodec           *acodec;
     AVCodec           *vcodec;
+    void              *vhwenc;
 
     int                have_audio;
     int                have_video;
@@ -121,6 +123,7 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     8,                          // audio_buffer_number
     3,                          // video_buffer_number
     0,                          // video_timebase_type
+    0,                          // video_encoder_type
 };
 
 // 内部函数实现
@@ -221,7 +224,11 @@ static void* video_encode_thread_proc(void *param)
             pkt.pts    = vframe->pts;
             pkt.dts    = vframe->pts;
             write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
-        } else {
+        } else if (encoder->params.video_encoder_type) { // hardware video encoder
+#ifdef ENABLE_H264_HWENC
+            // todo..
+#endif
+        } else { // x264 software video encoder
             /* encode the image */
             ret = avcodec_encode_video2(encoder->vstream->codec, &pkt, vframe, &got);
             if (ret < 0) {
@@ -589,6 +596,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->audio_buffer_number     ) params->audio_buffer_number     = DEF_FFENCODER_PARAMS.audio_buffer_number;
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
     if (!params->video_timebase_type     ) params->video_timebase_type     = DEF_FFENCODER_PARAMS.video_timebase_type;
+    if (!params->video_encoder_type      ) params->video_encoder_type      = DEF_FFENCODER_PARAMS.video_encoder_type;
     memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
 
     /* initialize libavcodec, and register all codecs and formats. */
@@ -615,6 +623,18 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         encoder->ofctxt->oformat->video_codec = (AVCodecID)encoder->params.in_video_encoded;
     }
     //-- for encoded video input data
+
+    //++ for hw video encoder
+    if (encoder->params.video_encoder_type) {
+#ifdef ENABLE_H264_HWENC
+        encoder->vhwenc = h264hwenc_init(
+            encoder->params.out_video_width,
+            encoder->params.out_video_height,
+            encoder->params.out_video_frame_rate,
+            encoder->params.out_video_bitrate);
+#endif
+    }
+    //-- for hw video encoder
 
     /* add the audio and video streams using the default format codecs
      * and initialize the codecs. */
@@ -673,6 +693,14 @@ void ffencoder_free(void *ctxt)
     /* close each codec. */
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
+
+    //++ for hw video encoder
+    if (encoder->params.video_encoder_type) {
+#ifdef ENABLE_H264_HWENC
+        h264hwenc_close(encoder->vhwenc);
+#endif
+    }
+    //-- for hw video encoder
 
     // destroy mutex
     pthread_mutex_destroy(&encoder->mutex);
