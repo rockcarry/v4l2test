@@ -72,7 +72,7 @@ static void* micdev_capture_thread_proc(void *param)
         usleep(10*1000);
     }
 
-    mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
+    env->ReleaseByteArrayElements(mic->audio_buffer, (jbyte*)mic->buffer, 0);
 
     // need call DetachCurrentThread
     g_jvm->DetachCurrentThread();
