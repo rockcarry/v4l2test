@@ -3,7 +3,7 @@
 
 // 包含头文件
 extern "C" {
-#include <libavutil/frame.h>
+#include <libavformat/avformat.h>
 }
 
 #ifdef __cplusplus
@@ -21,7 +21,6 @@ typedef struct
     int   in_video_height;
     int   in_video_pixfmt;
     int   in_video_frame_rate;
-    int   in_video_encoded;
 
     // output params
     char *out_filename;
@@ -37,8 +36,10 @@ typedef struct
     int   scale_flags;
     int   audio_buffer_number;
     int   video_buffer_number;
-    int   video_timebase_type; // 1 - by frame rate, 0 - by ms
-    int   video_encoder_type;  // 1 - hw h264, 0 - x264
+    int   video_timebase_type; // 0 - by ms, 1 - by frame rate
+    int   video_encoder_type;  // 0 - using x264 software encoder
+                               // 1 - using h264 hardware encoder
+                               // 2 - input video data is encoded mjpeg data
 } FFENCODER_PARAMS;
 
 // 函数声明
@@ -46,6 +47,10 @@ void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
 int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts);
 int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts);
+
+#ifdef ENABLE_H264_HWENC
+int   ffencoder_write_video_frame(void *ctxt, AVPacket *pkt);
+#endif
 
 #ifdef __cplusplus
 }

@@ -40,7 +40,6 @@ int main(void)
         240,                       // in_video_height
         AV_PIX_FMT_YUYV422,        // in_video_pixfmt
         30,                        // in_video_frame_rate
-        0,                         // in_video_encoded
 
         // output params
         (char*)"/sdcard/test.mp4", // filename
@@ -57,6 +56,7 @@ int main(void)
         5,                         // audio_buffer_number
         5,                         // video_buffer_number
         1,                         // timebase by frame rate
+        0,                         // video_encoder_type
     };
     encoder = ffencoder_init(&param);
 

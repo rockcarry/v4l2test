@@ -90,6 +90,7 @@ static void render_v4l2(CAMDEV *cam,
 
     // memcpy if same fmt and size
     if (sws_src_fmt == sws_dst_fmt && srcw == dstw && srch == dsth) {
+//      ALOGD("===ck=== sws_src_fmt = 0x%0x, sws_dst_fmt = 0x%0x", sws_src_fmt, sws_dst_fmt);
         memcpy(dstbuf, srcbuf, dstlen < srclen ? dstlen : srclen);
         return;
     }
@@ -333,16 +334,19 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         cam->cam_h      = h;
     }
     else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV21, &w, &h)) {
+//      ALOGD("===ck=== V4L2_PIX_FMT_NV21");
         cam->cam_pixfmt = V4L2_PIX_FMT_NV21;
         cam->cam_w      = w;
         cam->cam_h      = h;
     }
     else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_NV12, &w, &h)) {
+//      ALOGD("===ck=== V4L2_PIX_FMT_NV12");
         cam->cam_pixfmt = V4L2_PIX_FMT_NV12;
         cam->cam_w      = w;
         cam->cam_h      = h;
     }
     else if (0 == v4l2_try_fmt_size(cam->fd, V4L2_PIX_FMT_YUYV, &w, &h)) {
+//      ALOGD("===ck=== V4L2_PIX_FMT_YUYV");
         cam->cam_pixfmt = V4L2_PIX_FMT_YUYV;
         cam->cam_w      = w;
         cam->cam_h      = h;

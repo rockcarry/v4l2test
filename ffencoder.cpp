@@ -18,6 +18,13 @@ extern "C" {
 #include <libswresample/swresample.h>
 }
 
+#ifdef ENABLE_H264_HWENC
+#include <jni.h>
+extern    JavaVM* g_jvm;
+JNIEXPORT JNIEnv* get_jni_env(void);
+#endif
+
+
 //++ frame dropper
 typedef struct {
     int x;
@@ -106,7 +113,6 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     480,                        // in_video_height
     AV_PIX_FMT_YUYV422,         // in_video_pixfmt
     30,                         // in_video_frame_rate
-    0,                          // in_video_encoded
 
     // output params
     (char*)"/sdcard/test.mp4",  // filename
@@ -120,8 +126,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    8,                          // audio_buffer_number
-    3,                          // video_buffer_number
+    3,                          // audio_buffer_number
+    2,                          // video_buffer_number
     0,                          // video_timebase_type
     0,                          // video_encoder_type
 };
@@ -201,6 +207,10 @@ static void* video_encode_thread_proc(void *param)
     int        got     =  0;
     int        ret     =  0;
 
+#ifdef ENABLE_H264_HWENC
+    JNIEnv *env = get_jni_env();
+#endif
+
     memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
@@ -217,19 +227,8 @@ static void* video_encode_thread_proc(void *param)
         vframe = &encoder->vframes[encoder->vhead];
 
         // encode & write video
-        if (encoder->params.in_video_encoded) {
-            pkt.flags |= AV_PKT_FLAG_KEY;
-            pkt.data   = vframe->data[0];
-            pkt.size   = vframe->pkt_size;
-            pkt.pts    = vframe->pts;
-            pkt.dts    = vframe->pts;
-            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
-        } else if (encoder->params.video_encoder_type) { // hardware video encoder
-#ifdef ENABLE_H264_HWENC
-            // todo..
-#endif
-        } else { // x264 software video encoder
-            /* encode the image */
+        switch (encoder->params.video_encoder_type) {
+        case 0: // using x264 software encoder
             ret = avcodec_encode_video2(encoder->vstream->codec, &pkt, vframe, &got);
             if (ret < 0) {
                 printf("error encoding video frame !\n");
@@ -239,6 +238,20 @@ static void* video_encode_thread_proc(void *param)
             if (got) {
                 write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
             }
+            break;
+        case 1: // using h264 hardware encoder
+#ifdef ENABLE_H264_HWENC
+            h264hwenc_encode(encoder->vhwenc, vframe, 1000);
+#endif
+            break;
+        case 2: // input video data is encoded mjpeg data
+            pkt.flags |= AV_PKT_FLAG_KEY;
+            pkt.data   = vframe->data[0];
+            pkt.size   = vframe->pkt_size;
+            pkt.pts    = vframe->pts;
+            pkt.dts    = vframe->pts;
+            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+            break;
         }
 
         if (ret < 0) {
@@ -258,6 +271,11 @@ static void* video_encode_thread_proc(void *param)
             write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
         }
     } while (got);
+
+#ifdef ENABLE_H264_HWENC
+    // need call DetachCurrentThread
+    g_jvm->DetachCurrentThread();
+#endif
 
     return NULL;
 }
@@ -486,7 +504,11 @@ static void open_video(FFENCODER *encoder)
         (AVPixelFormat)encoder->params.in_video_pixfmt,
         c->width,
         c->height,
+#ifdef ENABLE_H264_HWENC
+        (AVPixelFormat)h264hwenc_picture_format(encoder->vhwenc),
+#else
         (AVPixelFormat)c->pix_fmt,
+#endif
         encoder->params.scale_flags,
         NULL, NULL, NULL);
     if (!encoder->sws_ctx) {
@@ -500,17 +522,26 @@ static void open_video(FFENCODER *encoder)
         exit(1);
     }
 
-    if (encoder->params.in_video_encoded) {
+    switch (encoder->params.video_encoder_type) {
+    case 0: // using x264 software encoder
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
+        }
+        break;
+    case 1: // using h264 hardware encoder
+#ifdef ENABLE_H264_HWENC
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            h264hwenc_picture_alloc(encoder->vhwenc, &encoder->vframes[i]);
+        }
+#endif
+        break;
+    case 2: // input video data is encoded mjpeg data
         //++ for encoded video data input, we allocate large enough vframes
         for (i=0; i<encoder->params.video_buffer_number; i++) {
             alloc_picture(&encoder->vframes[i], AV_PIX_FMT_RGB24, c->width, c->height);
         }
         //-- for encoded video data input, we allocate large enough vframes
-    }
-    else {
-        for (i=0; i<encoder->params.video_buffer_number; i++) {
-            alloc_picture(&encoder->vframes[i], c->pix_fmt, c->width, c->height);
-        }
+        break;
     }
 
     sem_init(&encoder->vsemr, 0, 0                                  );
@@ -552,8 +583,19 @@ static void close_vstream(FFENCODER *encoder)
     sem_destroy(&encoder->vsemw);
 
     //+ free video frames
-    for (i=0; i<encoder->params.video_buffer_number; i++) {
-        av_frame_unref(&encoder->vframes[i]);
+    switch (encoder->params.video_encoder_type) {
+    case 1: // using h264 hardware encoder
+#ifdef ENABLE_H264_HWENC
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            h264hwenc_picture_free(encoder->vhwenc, &encoder->vframes[i]);
+        }
+#endif
+        break;
+    default:
+        for (i=0; i<encoder->params.video_buffer_number; i++) {
+            av_frame_unref(&encoder->vframes[i]);
+        }
+        break;
     }
     free(encoder->vframes);
     //- free video frames
@@ -583,7 +625,6 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->in_video_height         ) params->in_video_height         = DEF_FFENCODER_PARAMS.in_video_height;
     if (!params->in_video_pixfmt         ) params->in_video_pixfmt         = DEF_FFENCODER_PARAMS.in_video_pixfmt;
     if (!params->in_video_frame_rate     ) params->in_video_frame_rate     = DEF_FFENCODER_PARAMS.in_video_frame_rate;
-    if (!params->in_video_encoded        ) params->in_video_encoded        = DEF_FFENCODER_PARAMS.in_video_encoded;
     if (!params->out_filename            ) params->out_filename            = DEF_FFENCODER_PARAMS.out_filename;
     if (!params->out_audio_bitrate       ) params->out_audio_bitrate       = DEF_FFENCODER_PARAMS.out_audio_bitrate;
     if (!params->out_audio_channel_layout) params->out_audio_channel_layout= DEF_FFENCODER_PARAMS.out_audio_channel_layout;
@@ -618,23 +659,21 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         encoder->ofctxt->oformat->video_codec = AV_CODEC_ID_H264;
     }
 
-    //++ for encoded video input data
-    if (encoder->params.in_video_encoded) {
-        encoder->ofctxt->oformat->video_codec = (AVCodecID)encoder->params.in_video_encoded;
-    }
-    //-- for encoded video input data
-
-    //++ for hw video encoder
-    if (encoder->params.video_encoder_type) {
+    switch (encoder->params.video_encoder_type) {
+    case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
         encoder->vhwenc = h264hwenc_init(
             encoder->params.out_video_width,
             encoder->params.out_video_height,
             encoder->params.out_video_frame_rate,
-            encoder->params.out_video_bitrate);
+            encoder->params.out_video_bitrate,
+            encoder);
 #endif
+        break;
+    case 2: // input video data is encoded mjpeg data
+        encoder->ofctxt->oformat->video_codec = AV_CODEC_ID_MJPEG;
+        break;
     }
-    //-- for hw video encoder
 
     /* add the audio and video streams using the default format codecs
      * and initialize the codecs. */
@@ -694,13 +733,13 @@ void ffencoder_free(void *ctxt)
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
 
-    //++ for hw video encoder
-    if (encoder->params.video_encoder_type) {
+    switch (encoder->params.video_encoder_type) {
+    case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
         h264hwenc_close(encoder->vhwenc);
 #endif
+        break;
     }
-    //-- for hw video encoder
 
     // destroy mutex
     pthread_mutex_destroy(&encoder->mutex);
@@ -799,26 +838,40 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
         vframe->pts = pts;
     }
 
-    if (encoder->params.in_video_encoded) {
-        // for encoded data, data[0] stored buffer addr, data[1] stored buffer size
-        uint8_t *srcbuf = (uint8_t*)data[0];
-        int      srclen = (int     )data[1];
-        uint8_t *dstbuf = (uint8_t*)vframe->data[0];
-        int      dstlen = vframe->linesize[0] * vframe->height;
-        int      cpylen = dstlen < srclen ? dstlen : srclen;
-        memcpy(dstbuf, srcbuf, cpylen);
-        vframe->pkt_size = cpylen;
-    }
-    else {
+    switch (encoder->params.video_encoder_type) {
+    case 2: // input video data is encoded mjpeg data
+        {
+            // for encoded data, data[0] stored buffer addr, data[1] stored buffer size
+            uint8_t *srcbuf = (uint8_t*)data[0];
+            int      srclen = (int     )data[1];
+            uint8_t *dstbuf = (uint8_t*)vframe->data[0];
+            int      dstlen = vframe->linesize[0] * vframe->height;
+            int      cpylen = dstlen < srclen ? dstlen : srclen;
+            memcpy(dstbuf, srcbuf, cpylen);
+            vframe->pkt_size = cpylen;
+        }
+        break;
+    default:
         // scale video image
-        sws_scale(
-            encoder->sws_ctx,
-            (const uint8_t * const *)data,
-            linesize,
-            0,
-            encoder->params.in_video_height,
-            vframe->data,
-            vframe->linesize);
+#ifdef ENABLE_H264_HWENC
+        if (  vframe->format == encoder->params.in_video_pixfmt
+           && vframe->width  == encoder->params.in_video_width
+           && vframe->height == encoder->params.in_video_height ) {
+//          memcpy(vframe->data[0], ((uint8_t*)data[0]) + 0, vframe->width * vframe->height * 12 / 8 - 0);
+            memcpy(vframe->data[0], ((uint8_t*)data[0]) + 1, vframe->width * vframe->height * 12 / 8 - 1); // nv21 -> nv12 for a33
+        } else
+#endif
+        {
+            sws_scale(
+                encoder->sws_ctx,
+                (const uint8_t * const *)data,
+                linesize,
+                0,
+                encoder->params.in_video_height,
+                vframe->data,
+                vframe->linesize);
+        }
+        break;
     }
 
     if (++encoder->vtail == encoder->params.video_buffer_number) {
@@ -828,4 +881,12 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
     sem_post(&encoder->vsemr);
     return 0;
 }
+
+#ifdef ENABLE_H264_HWENC
+int ffencoder_write_video_frame(void *ctxt, AVPacket *pkt)
+{
+    FFENCODER *encoder = (FFENCODER*)ctxt;
+    return write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, pkt);
+}
+#endif
 

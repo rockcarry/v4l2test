@@ -48,8 +48,8 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     // camdev input params
     (char*)"/dev/video0",       // cam_dev_name_0
     0,                          // cam_sub_src_0
-    1280,                       // cam_frame_width_0
-    720,                        // cam_frame_height_0
+    1920,                       // cam_frame_width_0
+    1080,                       // cam_frame_height_0
     25,                         // cam_frame_rate_0
 
     // camdev input params
@@ -63,9 +63,9 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     16000,                      // out_audio_bitrate_0
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_0
     16000,                      // out_audio_samprate_0
-    640000,                     // out_video_bitrate_0
-    320,                        // out_video_width_0
-    240,                        // out_video_height_0
+    10000000,                   // out_video_bitrate_0
+    1920,                       // out_video_width_0
+    1080,                       // out_video_height_0
     25,                         // out_video_frate_0
 
     // ffencoder output
@@ -436,7 +436,6 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.in_video_height         = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_HEIGHT);
     encoder_params.in_video_pixfmt         = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT));
     encoder_params.in_video_frame_rate     = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE );
-    encoder_params.in_video_encoded        = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? AV_CODEC_ID_MJPEG : 0;
     encoder_params.out_filename            = filename;
     encoder_params.out_audio_bitrate       = abitrate;
     encoder_params.out_audio_channel_layout= achlayout;
@@ -449,6 +448,11 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
     encoder_params.video_timebase_type     = 0; // timebase by ms
+#ifdef ENABLE_H264_HWENC
+    encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 1;
+#else
+    encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 0;
+#endif
     recorder->enclose[encidx] = recorder->encoder[encidx];
     recorder->encoder[encidx] = ffencoder_init(&encoder_params);
     if (!recorder->encoder[encidx]) {
