@@ -857,8 +857,8 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
         if (  vframe->format == encoder->params.in_video_pixfmt
            && vframe->width  == encoder->params.in_video_width
            && vframe->height == encoder->params.in_video_height ) {
-//          memcpy(vframe->data[0], ((uint8_t*)data[0]) + 0, vframe->width * vframe->height * 12 / 8 - 0);
-            memcpy(vframe->data[0], ((uint8_t*)data[0]) + 1, vframe->width * vframe->height * 12 / 8 - 1); // nv21 -> nv12 for a33
+            memcpy(vframe->data[0], ((uint8_t*)data[0]) + 0, vframe->width * vframe->height * 12 / 8 - 0);
+//          memcpy(vframe->data[0], ((uint8_t*)data[0]) + 1, vframe->width * vframe->height * 12 / 8 - 1); // nv21 <-> nv12 for a33
         } else
 #endif
         {

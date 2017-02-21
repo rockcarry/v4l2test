@@ -78,7 +78,7 @@ void h264hwenc_close(void *ctxt)
 
 int h264hwenc_picture_format(void *ctxt)
 {
-    return AV_PIX_FMT_NV21;
+    return AV_PIX_FMT_NV12;
 }
 
 int h264hwenc_picture_alloc(void *ctxt, AVFrame *frame)
