@@ -140,7 +140,8 @@ LOCAL_CFLAGS += \
     -DENABLE_H264_HWENC
 
 LOCAL_SRC_FILES := \
-    h264hwenc.cpp \
+    h264hwenc_mediacodec.cpp \
+    h264hwenc_cedarx.cpp \
     micdev_android.cpp \
     camdev.cpp \
     ffjpeg.cpp \

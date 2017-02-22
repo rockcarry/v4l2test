@@ -25,7 +25,7 @@ extern    JavaVM* g_jvm;
 JNIEXPORT JNIEnv* get_jni_env(void);
 
 // º¯ÊýÊµÏÖ
-void *h264hwenc_init(int w, int h, int frate, int bitrate, void *ffencoder)
+void *h264hwenc_mediacodec_init(int w, int h, int frate, int bitrate, void *ffencoder)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)calloc(1, sizeof(H264ENC));
@@ -60,7 +60,7 @@ void *h264hwenc_init(int w, int h, int frate, int bitrate, void *ffencoder)
     return enc;
 }
 
-void h264hwenc_close(void *ctxt)
+void h264hwenc_mediacodec_close(void *ctxt)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)ctxt;
@@ -76,12 +76,12 @@ void h264hwenc_close(void *ctxt)
     free(enc);
 }
 
-int h264hwenc_picture_format(void *ctxt)
+int h264hwenc_mediacodec_picture_format(void *ctxt)
 {
     return AV_PIX_FMT_NV12;
 }
 
-int h264hwenc_picture_alloc(void *ctxt, AVFrame *frame)
+int h264hwenc_mediacodec_picture_alloc(void *ctxt, AVFrame *frame)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)ctxt;
@@ -100,7 +100,7 @@ int h264hwenc_picture_alloc(void *ctxt, AVFrame *frame)
     return 0;
 }
 
-int h264hwenc_picture_free(void *ctxt, AVFrame *frame)
+int h264hwenc_mediacodec_picture_free(void *ctxt, AVFrame *frame)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)ctxt;
@@ -112,7 +112,7 @@ int h264hwenc_picture_free(void *ctxt, AVFrame *frame)
     return 0;
 }
 
-int h264hwenc_encode(void *ctxt, AVFrame *frame, int timeout)
+int h264hwenc_mediacodec_encode(void *ctxt, AVFrame *frame, int timeout)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)ctxt;
