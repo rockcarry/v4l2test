@@ -663,6 +663,8 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
         encoder->vhwenc = h264hwenc_init(
+            encoder->params.in_video_width,
+            encoder->params.in_video_height,
             encoder->params.out_video_width,
             encoder->params.out_video_height,
             encoder->params.out_video_frame_rate,

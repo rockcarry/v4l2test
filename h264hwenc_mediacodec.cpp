@@ -11,8 +11,10 @@
 // 内部类型定义
 // h264hwenc context
 typedef struct {
-    int         w;
-    int         h;
+    int         iw;
+    int         ih;
+    int         ow;
+    int         oh;
     jmethodID   init;
     jmethodID   free;
     jmethodID   enqueue;
@@ -25,7 +27,7 @@ extern    JavaVM* g_jvm;
 JNIEXPORT JNIEnv* get_jni_env(void);
 
 // 函数实现
-void *h264hwenc_mediacodec_init(int w, int h, int frate, int bitrate, void *ffencoder)
+void *h264hwenc_mediacodec_init(int iw, int ih, int ow, int oh, int frate, int bitrate, void *ffencoder)
 {
     JNIEnv  *env = get_jni_env();
     H264ENC *enc = (H264ENC*)calloc(1, sizeof(H264ENC));
@@ -40,8 +42,10 @@ void *h264hwenc_mediacodec_init(int w, int h, int frate, int bitrate, void *ffen
     enc->free      = (jmethodID)env->GetMethodID(h264enc_class, "free", "()V");
     enc->enqueue   = (jmethodID)env->GetMethodID(h264enc_class, "enqueueInputBuffer", "([BJI)Z");
     enc->dequeue   = (jmethodID)env->GetMethodID(h264enc_class, "dequeueOutputBuffer", "(I)[B");
-    enc->w         = w;
-    enc->h         = h;
+    enc->iw         = iw;
+    enc->ih         = ih;
+    enc->ow         = ow;
+    enc->oh         = oh;
     enc->ffencoder = ffencoder;
 
     // new H264HwEncoder
@@ -55,7 +59,7 @@ void *h264hwenc_mediacodec_init(int w, int h, int frate, int bitrate, void *ffen
     env->DeleteLocalRef(obj);
 
     // init
-    env->CallVoidMethod(enc->object, enc->init, w, h, frate, bitrate);
+    env->CallVoidMethod(enc->object, enc->init, ow, oh, frate, bitrate);
 
     return enc;
 }
@@ -87,15 +91,15 @@ int h264hwenc_mediacodec_picture_alloc(void *ctxt, AVFrame *frame)
     H264ENC *enc = (H264ENC*)ctxt;
     if (!enc) return -1;
 
-    jbyteArray array   = env->NewByteArray(enc->w * enc->h * 12 / 8);
-    frame->width       = enc->w;
-    frame->height      = enc->h;
+    jbyteArray array   = env->NewByteArray(enc->ow * enc->oh * 12 / 8);
+    frame->width       = enc->ow;
+    frame->height      = enc->oh;
     frame->format      = h264hwenc_picture_format(enc);
     frame->opaque      = (jbyteArray)env->NewGlobalRef(array);
     frame->data[0]     = (uint8_t*)env->GetByteArrayElements(array, 0);
-    frame->data[1]     = frame->data[0] + enc->w * enc->h;
-    frame->linesize[0] = enc->w;
-    frame->linesize[1] = enc->w;
+    frame->data[1]     = frame->data[0] + enc->ow * enc->oh;
+    frame->linesize[0] = enc->ow;
+    frame->linesize[1] = enc->ow;
     env->DeleteLocalRef(array);
     return 0;
 }

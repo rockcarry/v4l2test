@@ -9,7 +9,7 @@ extern "C" {
 
 // º¯Êý¶¨Òå
 //++ android media codec hardware h264 encoder ++//
-void *h264hwenc_mediacodec_init  (int w, int h, int frate, int bitrate, void *ffencoder);
+void *h264hwenc_mediacodec_init  (int iw, int ih, int ow, int oh, int frate, int bitrate, void *ffencoder);
 void  h264hwenc_mediacodec_close (void *ctxt);
 int   h264hwenc_mediacodec_encode(void *ctxt, AVFrame *frame, int timeout);
 int   h264hwenc_mediacodec_picture_format(void *ctxt);
@@ -18,7 +18,7 @@ int   h264hwenc_mediacodec_picture_free  (void *ctxt, AVFrame *frame);
 //-- android media codec hardware h264 encoder --//
 
 //++ allwinner cedarx hardware h264 encoder ++//
-void *h264hwenc_cedarx_init  (int w, int h, int frate, int bitrate, void *ffencoder);
+void *h264hwenc_cedarx_init  (int iw, int ih, int ow, int oh, int frate, int bitrate, void *ffencoder);
 void  h264hwenc_cedarx_close (void *ctxt);
 int   h264hwenc_cedarx_encode(void *ctxt, AVFrame *frame, int timeout);
 int   h264hwenc_cedarx_picture_format(void *ctxt);

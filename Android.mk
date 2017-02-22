@@ -154,7 +154,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libui \
     libgui \
-    libandroid_runtime
+    libandroid_runtime \
+    libaw_h264enc
 
 #++ for ffmpeg library
 LOCAL_CFLAGS += \
