@@ -135,6 +135,7 @@ int h264hwenc_mediacodec_encode(void *ctxt, AVFrame *frame, int timeout)
 
     AVPacket pkt;
     memset(&pkt, 0, sizeof(pkt));
+    pkt.flags |= buffer[4] == 0x67 ? AV_PKT_FLAG_KEY : 0;
     pkt.data   = buffer;
     pkt.size   = env->GetArrayLength(array);
     pkt.pts    = frame->pts;
