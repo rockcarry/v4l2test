@@ -95,7 +95,8 @@ typedef struct
     int                have_audio;
     int                have_video;
 
-    #define FFENCODER_TS_EXIT    (1 << 0)
+    #define FFENCODER_TS_AEXIT   (1 << 0)
+    #define FFENCODER_TS_VEXIT   (1 << 1)
     int                thread_state;
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
@@ -126,7 +127,7 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    3,                          // audio_buffer_number
+    2,                          // audio_buffer_number
     2,                          // video_buffer_number
     0,                          // video_timebase_type
     0,                          // video_encoder_type
@@ -160,7 +161,7 @@ static void* audio_encode_thread_proc(void *param)
 
     while (1) {
         if (0 != sem_trywait(&encoder->asemr)) {
-            if (encoder->thread_state & FFENCODER_TS_EXIT) {
+            if (encoder->thread_state & FFENCODER_TS_AEXIT) {
                 break;
             }
             else {
@@ -215,7 +216,7 @@ static void* video_encode_thread_proc(void *param)
 
     while (1) {
         if (0 != sem_trywait(&encoder->vsemr)) {
-            if (encoder->thread_state & FFENCODER_TS_EXIT) {
+            if (encoder->thread_state & FFENCODER_TS_VEXIT) {
                 break;
             }
             else {
@@ -265,12 +266,14 @@ static void* video_encode_thread_proc(void *param)
         sem_post(&encoder->vsemw);
     }
 
-    do {
-        avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
-        if (got) {
-            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
-        }
-    } while (got);
+    if (encoder->params.video_encoder_type == 0) {
+        do {
+            avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
+            if (got) {
+                write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+            }
+        } while (got);
+    }
 
 #ifdef ENABLE_H264_HWENC
     // need call DetachCurrentThread
@@ -555,7 +558,7 @@ static void close_astream(FFENCODER *encoder)
 {
     int i;
 
-    encoder->thread_state |= FFENCODER_TS_EXIT;
+    encoder->thread_state |= FFENCODER_TS_AEXIT;
     pthread_join(encoder->aencode_thread_id, NULL);
 
     sem_destroy(&encoder->asemr);
@@ -576,7 +579,7 @@ static void close_vstream(FFENCODER *encoder)
 {
     int i;
 
-    encoder->thread_state |= FFENCODER_TS_EXIT;
+    encoder->thread_state |= FFENCODER_TS_VEXIT;
     pthread_join(encoder->vencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);

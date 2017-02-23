@@ -72,19 +72,19 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     16000,                      // out_audio_bitrate_1
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_1
     16000,                      // out_audio_samprate_1
-    2000000,                    // out_video_bitrate_1
-    640,                        // out_video_width_1
-    480,                        // out_video_height_1
+    5000000,                    // out_video_bitrate_1
+    1280,                       // out_video_width_1
+    720,                        // out_video_height_1
     25,                         // out_video_frate_1
 
     // ffencoder output
     16000,                      // out_audio_bitrate_2
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_2
     16000,                      // out_audio_samprate_2
-    384000,                     // out_video_bitrate_2
-    320,                        // out_video_width_2
-    200,                        // out_video_height_2
-    15,                         // out_video_frate_2
+    2000000,                    // out_video_bitrate_2
+    640,                        // out_video_width_2
+    480,                        // out_video_height_2
+    25,                         // out_video_frate_2
 };
 
 // 内部函数实现
