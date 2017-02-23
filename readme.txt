@@ -48,6 +48,7 @@ Features
 10. record segmented video with out dropping any frame
 11. auto drop frame when could't encoding in time
 12. support push rtmp/hls live stream
+13. support android mediacodec h264 hardware encoding
 
 
 How to use
@@ -90,9 +91,7 @@ TODO
 1.  implments hardware encoding for A33 platfrom
     plan to write a hardware H264 encoding ffmpeg codec for A33 platform
 
-2.  implments hardware encoding using jni access to android MediaCodec java class library
-
-3.  stability and performance
+2.  stability and performance
 
 
 
