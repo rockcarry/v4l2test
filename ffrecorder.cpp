@@ -20,10 +20,7 @@ typedef struct
     int               rsvpts [MAX_CAMDEV_NUM ];
     void             *encoder[MAX_ENCODER_NUM];
     void             *enclose[MAX_ENCODER_NUM];
-    #define FRF_RECORDING   (1 << 1 )
-    #define FRF_RECORD_REQ  (1 << 2 )
-    #define FRF_RECORD_MACK (1 << 16)
-    #define FRF_RECORD_CACK (1 << 17)
+    #define FRF_RECORDING   (1 << 1)
     int               state;
 
     int audio_source[MAX_ENCODER_NUM];
@@ -93,15 +90,11 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
-        if (!(recorder->state & FRF_RECORD_REQ)) {
-            recorder->state |= FRF_RECORD_MACK;
-        }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->audio_source[i] == 0) {
                 ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
             }
         }
-        recorder->state &= ~FRF_RECORD_MACK;
     }
     return 0;
 }
@@ -111,9 +104,6 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
-        if (!(recorder->state & FRF_RECORD_REQ)) {
-            recorder->state |= FRF_RECORD_CACK;
-        }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 0) {
                 if (recorder->rsvpts[0] == -1) {
@@ -125,7 +115,6 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
-        recorder->state &= ~FRF_RECORD_CACK;
     }
 
     // use jpgenc to take photo
@@ -146,9 +135,6 @@ static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
-        if (!(recorder->state & FRF_RECORD_REQ)) {
-            recorder->state |= FRF_RECORD_CACK;
-        }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 1) {
                 if (recorder->rsvpts[1] == -1) {
@@ -160,7 +146,6 @@ static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
-        recorder->state &= ~FRF_RECORD_CACK;
     }
 
     // use jpgenc to take photo
@@ -186,7 +171,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
     }
 
     // using default params if not set
-    if (!params                      ) params                       = &DEF_FFRECORDER_PARAMS;
+    if (!params                      ) params                       =&DEF_FFRECORDER_PARAMS;
     if (!params->mic_sample_rate     ) params->mic_sample_rate      = DEF_FFRECORDER_PARAMS.mic_sample_rate;
     if (!params->mic_sample_rate     ) params->mic_channel_num      = DEF_FFRECORDER_PARAMS.mic_channel_num;
     if (!params->cam_dev_name_0      ) params->cam_dev_name_0       = DEF_FFRECORDER_PARAMS.cam_dev_name_0;
@@ -461,11 +446,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
 
     // reset record start vpts
     recorder->rsvpts[vidsrc] = -1;
-
-    // set request recording flag and wait switch done
-    recorder->state |= (FRF_RECORD_REQ|FRF_RECORDING);
-    while (recorder->state & (FRF_RECORD_MACK|FRF_RECORD_CACK)) usleep(10*1000);
-    recorder->state &=~(FRF_RECORD_REQ);
+    recorder->state |= (FRF_RECORDING);
 }
 
 void ffrecorder_record_stop(void *ctxt, int encidx)
@@ -483,10 +464,7 @@ void ffrecorder_record_stop(void *ctxt, int encidx)
 
     recorder->enclose[encidx] = recorder->encoder[encidx];
     recorder->encoder[encidx] = NULL;
-
-    recorder->state |= (FRF_RECORD_REQ|FRF_RECORDING);
-    while (recorder->state & (FRF_RECORD_MACK|FRF_RECORD_CACK)) usleep(10*1000);
-    recorder->state &=~(FRF_RECORD_REQ|FRF_RECORDING);
+    recorder->state &=~(FRF_RECORDING);
 }
 
 void ffrecorder_record_audio_source(void *ctxt, int encidx, int source)

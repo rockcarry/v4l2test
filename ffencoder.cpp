@@ -95,8 +95,7 @@ typedef struct
     int                have_audio;
     int                have_video;
 
-    #define FFENCODER_TS_AEXIT   (1 << 0)
-    #define FFENCODER_TS_VEXIT   (1 << 1)
+    #define FFENCODER_TS_EXIT    (1 << 0)
     int                thread_state;
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
@@ -161,7 +160,7 @@ static void* audio_encode_thread_proc(void *param)
 
     while (1) {
         if (0 != sem_trywait(&encoder->asemr)) {
-            if (encoder->thread_state & FFENCODER_TS_AEXIT) {
+            if (encoder->thread_state & FFENCODER_TS_EXIT) {
                 break;
             }
             else {
@@ -216,7 +215,7 @@ static void* video_encode_thread_proc(void *param)
 
     while (1) {
         if (0 != sem_trywait(&encoder->vsemr)) {
-            if (encoder->thread_state & FFENCODER_TS_VEXIT) {
+            if (encoder->thread_state & FFENCODER_TS_EXIT) {
                 break;
             }
             else {
@@ -558,7 +557,7 @@ static void close_astream(FFENCODER *encoder)
 {
     int i;
 
-    encoder->thread_state |= FFENCODER_TS_AEXIT;
+    encoder->thread_state |= FFENCODER_TS_EXIT;
     pthread_join(encoder->aencode_thread_id, NULL);
 
     sem_destroy(&encoder->asemr);
@@ -579,7 +578,7 @@ static void close_vstream(FFENCODER *encoder)
 {
     int i;
 
-    encoder->thread_state |= FFENCODER_TS_VEXIT;
+    encoder->thread_state |= FFENCODER_TS_EXIT;
     pthread_join(encoder->vencode_thread_id, NULL);
 
     sem_destroy(&encoder->vsemr);
