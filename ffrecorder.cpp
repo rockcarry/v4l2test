@@ -17,9 +17,9 @@ typedef struct
     FFRECORDER_PARAMS params;
     void             *micdev [MAX_MICDEV_NUM ];
     void             *camdev [MAX_CAMDEV_NUM ];
-    int               rsvpts [MAX_CAMDEV_NUM ];
-    void             *encoder[MAX_ENCODER_NUM];
-    void             *enclose[MAX_ENCODER_NUM];
+    int               rsvpts [MAX_CAMDEV_NUM ]; // record start video pts
+    void             *encoder[MAX_ENCODER_NUM]; // encoders current running
+    void             *enclose[MAX_ENCODER_NUM]; // encoders need to be closed when switch next video file
     #define FRF_RECORDING   (1 << 1)
     int               state;
 
