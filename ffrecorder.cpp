@@ -123,8 +123,8 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
         frame.format = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(recorder->camdev[0], CAMDEV_PARAM_VIDEO_PIXFMT));
         frame.width  = recorder->params.cam_frame_width_0 ;
         frame.height = recorder->params.cam_frame_height_0;
-        memcpy(frame.data    , data    , sizeof(data    ));
-        memcpy(frame.linesize, linesize, sizeof(linesize));
+        memcpy(frame.data    , data    , sizeof(void*)*AV_NUM_DATA_POINTERS);
+        memcpy(frame.linesize, linesize, sizeof(int  )*AV_NUM_DATA_POINTERS);
         ffjpeg_encoder_encode(recorder->jpgenc, recorder->take_photo_file[0], frame.width, frame.height, &frame);
         recorder->take_photo_flags &= ~(1 << 0);
     }
