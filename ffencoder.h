@@ -47,10 +47,7 @@ void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
 int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts);
 int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts);
-
-#ifdef ENABLE_H264_HWENC
 int   ffencoder_write_video_frame(void *ctxt, AVPacket *pkt);
-#endif
 
 #ifdef __cplusplus
 }

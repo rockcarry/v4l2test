@@ -886,11 +886,9 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
     return 0;
 }
 
-#ifdef ENABLE_H264_HWENC
 int ffencoder_write_video_frame(void *ctxt, AVPacket *pkt)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     return write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, pkt);
 }
-#endif
 

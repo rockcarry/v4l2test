@@ -91,8 +91,8 @@ static void render_v4l2(CAMDEV *cam,
     // memcpy if same fmt and size
     if (sws_src_fmt == sws_dst_fmt && srcw == dstw && srch == dsth) {
 //      ALOGD("===ck=== sws_src_fmt = 0x%0x, sws_dst_fmt = 0x%0x", sws_src_fmt, sws_dst_fmt);
-//      memcpy(dstbuf, srcbuf + 0, (dstlen < srclen ? dstlen : srclen) - 0);
-        memcpy(dstbuf, srcbuf + 1, (dstlen < srclen ? dstlen : srclen) - 1);
+//      memcpy(dstbuf, (uint8_t*)srcbuf + 0, (dstlen < srclen ? dstlen : srclen) - 0);
+        memcpy(dstbuf, (uint8_t*)srcbuf + 1, (dstlen < srclen ? dstlen : srclen) - 1);
         return;
     }
 
