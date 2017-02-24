@@ -137,7 +137,8 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS += \
     -DUSE_MICDEV_ANDROID \
     -DENABLE_MEDIARECORDER_JNI \
-    -DENABLE_H264_HWENC
+    -DENABLE_H264_HWENC \
+    -DUSE_CEDARX_H264ENC
 
 LOCAL_SRC_FILES := \
     h264hwenc_mediacodec.cpp \
@@ -155,6 +156,8 @@ LOCAL_SHARED_LIBRARIES := \
     libui \
     libgui \
     libandroid_runtime \
+    libion_alloc \
+    libcedarxosal \
     libaw_h264enc
 
 #++ for ffmpeg library

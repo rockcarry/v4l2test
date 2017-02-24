@@ -210,6 +210,10 @@ static void* camdev_capture_thread_proc(void *param)
                 // for mjpeg camera, data[0] store buffer addr, data[1] store buffer size
                 data[1] = (void*)cam->buf.bytesused;
             }
+            //++ for cedarx h264 hardware encoding need physic addr
+            data[4] = (uint8_t*)cam->buf.m.offset;
+            data[5] = (uint8_t*)cam->buf.m.offset + camw * camh;
+            //-- for cedarx h264 hardware encoding need physic addr
             cam->callback(cam->recorder, data, linesize, pts);
         }
 

@@ -187,8 +187,20 @@ typedef struct VENC_DEVICE
     int (*WaitFinishCB)(int uParam1, void *pMsg);
 } VENC_DEVICE;
 
+int cedarx_hardware_init(int mode);
+int cedarx_hardware_exit(int mode);
+
 VENC_DEVICE *H264EncInit(int *ret);
 int H264EncExit(VENC_DEVICE *pDev);
+
+int  ion_alloc_open   (void);
+int  ion_alloc_close  (void);
+int  ion_alloc_alloc  (int   size);
+void ion_alloc_free   (void *pbuf);
+int  ion_alloc_vir2phy(void *pbuf);
+int  ion_alloc_phy2vir(void *pbuf);
+void ion_flush_cache  (void *pbuf, int size);
+void ion_flush_cache_all(void);
 
 #ifdef __cplusplus
 }

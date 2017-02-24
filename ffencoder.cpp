@@ -860,9 +860,11 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 #ifdef ENABLE_H264_HWENC
         if (  vframe->format == encoder->params.in_video_pixfmt
            && vframe->width  == encoder->params.in_video_width
-           && vframe->height == encoder->params.in_video_height ) {
+           && vframe->height == encoder->params.in_video_height ) { // android mediacodec h264 hw encoding
             memcpy(vframe->data[0], ((uint8_t*)data[0]) + 0, vframe->width * vframe->height * 12 / 8 - 0);
 //          memcpy(vframe->data[0], ((uint8_t*)data[0]) + 1, vframe->width * vframe->height * 12 / 8 - 1); // nv21 <-> nv12 for a33
+        } else if (vframe->format == AV_PIX_FMT_NONE) { // allwinner cedarx h264 hw encoding
+            memcpy(vframe->data, data, sizeof(void*) * AV_NUM_DATA_POINTERS);
         } else
 #endif
         {

@@ -26,20 +26,27 @@ int   h264hwenc_cedarx_picture_alloc (void *ctxt, AVFrame *frame);
 int   h264hwenc_cedarx_picture_free  (void *ctxt, AVFrame *frame);
 //-- allwinner cedarx hardware h264 encoder --//
 
-#if 1
+#if defined USE_MEDIACODEC_H264ENC
 #define h264hwenc_init              h264hwenc_mediacodec_init
 #define h264hwenc_close             h264hwenc_mediacodec_close
 #define h264hwenc_encode            h264hwenc_mediacodec_encode
 #define h264hwenc_picture_format    h264hwenc_mediacodec_picture_format
 #define h264hwenc_picture_alloc     h264hwenc_mediacodec_picture_alloc
 #define h264hwenc_picture_free      h264hwenc_mediacodec_picture_free
-#else
+#elif defined USE_CEDARX_H264ENC
 #define h264hwenc_init              h264hwenc_cedarx_init
 #define h264hwenc_close             h264hwenc_cedarx_close
 #define h264hwenc_encode            h264hwenc_cedarx_encode
 #define h264hwenc_picture_format    h264hwenc_cedarx_picture_format
 #define h264hwenc_picture_alloc     h264hwenc_cedarx_picture_alloc
 #define h264hwenc_picture_free      h264hwenc_cedarx_picture_free
+#else
+inline void *h264hwenc_init  (int iw, int ih, int ow, int oh, int frate, int bitrate, void *ffencoder) { return NULL; }
+inline void  h264hwenc_close (void *ctxt) { return; }
+inline int   h264hwenc_encode(void *ctxt, AVFrame *frame, int timeout) { return 0; }
+inline int   h264hwenc_picture_format(void *ctxt)  { return 0; }
+inline int   h264hwenc_picture_alloc (void *ctxt, AVFrame *frame) { return 0; }
+inline int   h264hwenc_picture_free  (void *ctxt, AVFrame *frame) { return 0; }
 #endif
 
 #ifdef __cplusplus
