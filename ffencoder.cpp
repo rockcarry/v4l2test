@@ -372,7 +372,7 @@ static int add_vstream(FFENCODER *encoder)
     encoder->vstream->time_base.num = 1;
     encoder->vstream->time_base.den = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate : 1000;
     c->time_base = encoder->vstream->time_base;
-    c->gop_size  = 12; /* emit one intra frame every twelve frames at most */
+    c->gop_size  = encoder->params.out_video_frame_rate;
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
     if (c->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
         /* just for testing, we also add B frames */
