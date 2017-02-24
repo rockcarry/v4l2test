@@ -41,7 +41,6 @@ typedef struct {
     #define CAMDEV_TS_EXIT       (1 << 0)
     #define CAMDEV_TS_PAUSE      (1 << 1)
     #define CAMDEV_TS_PREVIEW    (1 << 2)
-    #define CAMDEV_TS_TEST_FRATE (1 << 3)
     pthread_t               thread_id;
     int                     thread_state;
     int                     update_flag;
@@ -50,7 +49,6 @@ typedef struct {
     int                     cam_w;
     int                     cam_h;
     int                     cam_frate; // camdev frame rate get from v4l2 interface
-    int                     act_frate; // camdev frame rate actual get by test frame
     SwsContext             *swsctxt;
     CAMDEV_CAPTURE_CALLBACK callback;
     void                   *recorder;
@@ -129,8 +127,6 @@ static void render_v4l2(CAMDEV *cam,
 static void* camdev_capture_thread_proc(void *param)
 {
     CAMDEV  *cam = (CAMDEV*)param;
-    uint64_t test_time  = 0;
-    int      test_count = 0;
     int      err;
 
     //++ for select
@@ -169,18 +165,6 @@ static void* camdev_capture_thread_proc(void *param)
         if (-1 == ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf)) {
             ALOGD("failed to de-queue buffer !\n");
             continue;
-        }
-
-        if (cam->thread_state & CAMDEV_TS_TEST_FRATE) {
-            if (test_count == 0) {
-                test_time = get_tick_count();
-            }
-            if (test_count++ == 5) {
-                cam->act_frate     = (int)(1000 * 5 / (get_tick_count() - test_time) + 0.5);
-                cam->thread_state &= ~CAMDEV_TS_TEST_FRATE;
-                test_count         = 0;
-                ALOGD("cam->act_frate: %d\n", cam->act_frate);
-            }
         }
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
@@ -390,6 +374,8 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
             streamparam.parm.capture.timeperframe.numerator );
         cam->cam_frate = (int)( streamparam.parm.capture.timeperframe.denominator
                               / streamparam.parm.capture.timeperframe.numerator);
+        cam->cam_frate = 30; // assume camera frame rate is 30fps
+        ALOGD("assume camera frame rate is 30fps !\n");
     }
     else {
         ALOGW("failed to set camera frame rate !\n");
@@ -420,7 +406,7 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
     }
 
     // set test frame rate flag
-    cam->thread_state |= CAMDEV_TS_PAUSE | CAMDEV_TS_TEST_FRATE;
+    cam->thread_state |= CAMDEV_TS_PAUSE;
 
     // create capture thread
     pthread_create(&cam->thread_id, NULL, camdev_capture_thread_proc, cam);
@@ -547,10 +533,7 @@ int camdev_get_param(void *ctxt, int id)
     case CAMDEV_PARAM_VIDEO_PIXFMT:
         return cam->cam_pixfmt;
     case CAMDEV_PARAM_VIDEO_FRATE:
-        for (int i=0; i<50 && cam->act_frate==0; i++) {
-            usleep(10*1000);
-        }
-        return cam->act_frate;
+        return cam->cam_frate;
     }
     return 0;
 }
