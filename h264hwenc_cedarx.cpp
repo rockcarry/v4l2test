@@ -39,7 +39,6 @@ void *h264hwenc_cedarx_init(int iw, int ih, int ow, int oh, int frate, int bitra
 
     // cedarx hardware init
     cedarx_hardware_init(0);
-    ion_alloc_open();
 
     int level = 0;
     int ret   = 0;
@@ -118,7 +117,6 @@ void h264hwenc_cedarx_close(void *ctxt)
     free(enc);
 
     // cedarx hardware exit
-    ion_alloc_close();
     cedarx_hardware_exit(0);
 }
 
@@ -201,6 +199,6 @@ int h264hwenc_cedarx_encode(void *ctxt, AVFrame *frame, int timeout)
         enc->encdev->ReleaseBitStreamInfo(enc->encdev, datainfo.idx);
     }
 
-    return -1;
+    return ret ? 0 : -1;
 }
 
