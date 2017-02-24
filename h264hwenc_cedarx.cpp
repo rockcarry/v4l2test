@@ -114,10 +114,11 @@ void h264hwenc_cedarx_close(void *ctxt)
     if (enc->output_buf) {
         free(enc->output_buf);
     }
-    free(enc);
 
     // cedarx hardware exit
     cedarx_hardware_exit(0);
+
+    free(enc);
 }
 
 int h264hwenc_cedarx_picture_format(void *ctxt)
@@ -153,52 +154,70 @@ int h264hwenc_cedarx_encode(void *ctxt, AVFrame *frame, int timeout)
     int ret = enc->encdev->encode(enc->encdev, &fbufinfo);
     if (ret < 0) {
         ALOGD("cedarx h264 encode frame failed !");
+        usleep(10000);
         return -1;
     }
 
+#if 0
     //++ wait until encoder has data output
     do {
         ret = enc->encdev->hasOutputStream(enc->encdev);
-//      ALOGD("hasOutputStream ret = %d.", ret);
+        ALOGD("hasOutputStream ret = %d.", ret);
         if (!ret) { usleep(10000); timeout -= 10; }
     } while (!ret && timeout > 0);
+    if (!ret) {
+        ALOGD("wait for output stream timeout !");
+        return -1;
+    }
     //-- wait until encoder has data output
+#endif
 
-    if (ret) {
-        __vbv_data_ctrl_info_t datainfo;
-        enc->encdev->GetBitStreamInfo(enc->encdev, &datainfo);
-        if (enc->firstframe) { enc->firstframe = 0; datainfo.keyFrameFlag = 1; }
-        int len = datainfo.uSize0 + datainfo.uSize1 + (datainfo.keyFrameFlag ? enc->sps_pps_len : 0);
-        if (enc->output_len < len) {
-            enc->output_len = len;
-//          ALOGD("current buffer len: %d, need buffer len: %d", enc->output_len, len);
-            if (!enc->output_buf) free(enc->output_buf);
-            enc->output_buf = (uint8_t*)malloc(len);
-            if (!enc->output_buf) {
-                ALOGD("failed to allocate output buffer %d !.", len);
-            }
-        }
-        if (enc->output_buf) {
-            int offset = 0;
-            if (datainfo.keyFrameFlag) {
-                memcpy(enc->output_buf + offset, enc->sps_pps_buf, enc->sps_pps_len);
-                offset += enc->sps_pps_len;
-            }
-            memcpy(enc->output_buf + offset, datainfo.pData0, datainfo.uSize0); offset += datainfo.uSize0;
-            memcpy(enc->output_buf + offset, datainfo.pData1, datainfo.uSize1); offset += datainfo.uSize1;
-
-            AVPacket pkt;
-            memset(&pkt, 0, sizeof(pkt));
-            pkt.flags |= datainfo.keyFrameFlag ? AV_PKT_FLAG_KEY : 0;
-            pkt.data   = enc->output_buf;
-            pkt.size   = offset;
-            pkt.pts    = frame->pts;
-            pkt.dts    = frame->pts;
-            ffencoder_write_video_frame(enc->ffencoder, &pkt);
-        }
-        enc->encdev->ReleaseBitStreamInfo(enc->encdev, datainfo.idx);
+    // get bit stream
+    __vbv_data_ctrl_info_t datainfo;
+    ret = enc->encdev->GetBitStreamInfo(enc->encdev, &datainfo);
+    if (ret != 0) {
+        ALOGD("GetBitStreamInfo failed !");
+        return -1;
     }
 
-    return ret ? 0 : -1;
+    // make sure first frame is key frame
+    if (enc->firstframe) { enc->firstframe = 0; datainfo.keyFrameFlag = 1; }
+
+    //++ reallocate buffer if needed
+    int len = datainfo.uSize0 + datainfo.uSize1 + (datainfo.keyFrameFlag ? enc->sps_pps_len : 0);
+    if (enc->output_len < len) {
+        enc->output_len = len;
+//      ALOGD("current buffer len: %d, need buffer len: %d", enc->output_len, len);
+        if (!enc->output_buf) free(enc->output_buf);
+        enc->output_buf = (uint8_t*)malloc(len);
+        if (!enc->output_buf) {
+            ALOGD("failed to allocate output buffer %d !.", len);
+        }
+    }
+    //-- reallocate buffer if needed
+
+    if (enc->output_buf) {
+        int offset = 0;
+        if (datainfo.keyFrameFlag) {
+            memcpy(enc->output_buf + offset, enc->sps_pps_buf, enc->sps_pps_len);
+            offset += enc->sps_pps_len;
+        }
+        memcpy(enc->output_buf + offset, datainfo.pData0, datainfo.uSize0); offset += datainfo.uSize0;
+        memcpy(enc->output_buf + offset, datainfo.pData1, datainfo.uSize1); offset += datainfo.uSize1;
+
+        AVPacket pkt;
+        memset(&pkt, 0, sizeof(pkt));
+        pkt.flags |= datainfo.keyFrameFlag ? AV_PKT_FLAG_KEY : 0;
+        pkt.data   = enc->output_buf;
+        pkt.size   = offset;
+        pkt.pts    = frame->pts;
+        pkt.dts    = frame->pts;
+        ffencoder_write_video_frame(enc->ffencoder, &pkt);
+    }
+
+    // release bit stream
+    enc->encdev->ReleaseBitStreamInfo(enc->encdev, datainfo.idx);
+
+    return 0;
 }
 
