@@ -82,7 +82,7 @@ typedef struct
     unsigned int   codec_type;
     int            width;
     int            height;
-    
+
     unsigned int   frame_rate;
     int            color_format;
     int            color_space;
@@ -90,7 +90,7 @@ typedef struct
     int            qp_min;          // 20
     int            avg_bit_rate;    // average bit rate
 //  int            max_bit_rate;    // maximum bit rate
-    
+
     int            maxKeyInterval;
     // define private information for video decode
 //  unsigned int   video_bs_src;    // video bitstream source
@@ -114,7 +114,7 @@ typedef struct
     unsigned char  enable_gps;
     double         gps_latitude;   // input
     double         gps_longitude;  // input
-    long           gps_altitude;  
+    long           gps_altitude;
     long           gps_timestamp;
     char           gps_processing_method[100];
     int            whitebalance;
