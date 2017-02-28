@@ -86,6 +86,18 @@ by libffrecorder_jni and MediaRecorder.java, you are able to use v4l2test for an
 an other related project is CameraDVR: https://github.com/rockcarry/CameraDVR
 
 
+permission issue ?
+==================
+on android platform, we usually got the permisson issue, such as file access permission, selinux permission, ..
+these permission issues, will cause our app unable to work correctly.
+for v4l2test/CameraDVR project, you want to test it ? you should first fix these permission issues, example:
+1. test it in adb shell as root user
+2. chmod 666 /dev/video*
+3. modify sepolicy if selinux is enforced
+4. ...
+
+
+
 TODO
 ====
 1.  implments hardware encoding for A33 platfrom
