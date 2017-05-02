@@ -94,7 +94,7 @@ int h264hwenc_mediacodec_picture_alloc(void *ctxt, AVFrame *frame)
     jbyteArray array   = env->NewByteArray(enc->ow * enc->oh * 12 / 8);
     frame->width       = enc->ow;
     frame->height      = enc->oh;
-    frame->format      = h264hwenc_picture_format(enc);
+    frame->format      = AV_PIX_FMT_NV12;
     frame->opaque      = (jbyteArray)env->NewGlobalRef(array);
     frame->data[0]     = (uint8_t*)env->GetByteArrayElements(array, 0);
     frame->data[1]     = frame->data[0] + enc->ow * enc->oh;

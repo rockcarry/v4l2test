@@ -138,11 +138,12 @@ LOCAL_CFLAGS += \
     -DUSE_MICDEV_ANDROID \
     -DENABLE_MEDIARECORDER_JNI \
     -DENABLE_H264_HWENC \
-    -DUSE_CEDARX_H264ENC
+    -DUSE_MEDIASERVER_H264ENC
 
 LOCAL_SRC_FILES := \
     h264hwenc_mediacodec.cpp \
     h264hwenc_cedarx.cpp \
+    h264hwenc_mediaserver.cpp \
     micdev_android.cpp \
     camdev.cpp \
     ffjpeg.cpp \
@@ -153,6 +154,7 @@ LOCAL_SRC_FILES := \
 LOCAL_SHARED_LIBRARIES := \
     libutils \
     libcutils \
+    libbinder \
     libui \
     libgui \
     libandroid_runtime \
