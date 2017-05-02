@@ -49,6 +49,7 @@ Features
 11. auto drop frame when could't encoding in time
 12. support push rtmp/hls live stream
 13. support android mediacodec h264 hardware encoding
+14. support cedarx hardware encoding for A33 platfrom
 
 
 How to use
@@ -100,10 +101,7 @@ for v4l2test/CameraDVR project, you want to test it ? you should first fix these
 
 TODO
 ====
-1.  implments hardware encoding for A33 platfrom
-    plan to write a hardware H264 encoding ffmpeg codec for A33 platform
-
-2.  stability and performance
+1. stability and performance
 
 
 
