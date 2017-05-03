@@ -432,7 +432,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.scale_flags             = 0; // use default
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
-    encoder_params.video_timebase_type     = 0; // timebase by ms
+    encoder_params.video_timebase_type     = 1; // timebase by frame rate
 #ifdef ENABLE_H264_HWENC
     encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 1;
 #else

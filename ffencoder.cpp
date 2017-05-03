@@ -204,6 +204,7 @@ static void* video_encode_thread_proc(void *param)
     FFENCODER *encoder = (FFENCODER*)param;
     AVFrame   *vframe  = NULL;
     AVPacket   pkt;
+    AVRational tbms    = { 1, 1000 };
     int        got     =  0;
     int        ret     =  0;
 
@@ -236,7 +237,7 @@ static void* video_encode_thread_proc(void *param)
             }
 
             if (got) {
-                write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+                write_frame(encoder, &tbms, encoder->vstream, &pkt);
             }
             break;
         case 1: // using h264 hardware encoder
@@ -250,7 +251,7 @@ static void* video_encode_thread_proc(void *param)
             pkt.size   = vframe->pkt_size;
             pkt.pts    = vframe->pts;
             pkt.dts    = vframe->pts;
-            write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+            write_frame(encoder, &tbms, encoder->vstream, &pkt);
             break;
         }
 
@@ -269,7 +270,7 @@ static void* video_encode_thread_proc(void *param)
         do {
             avcodec_encode_video2(encoder->vstream->codec, &pkt, NULL, &got);
             if (got) {
-                write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, &pkt);
+                write_frame(encoder, &tbms, encoder->vstream, &pkt);
             }
         } while (got);
     }
@@ -891,6 +892,7 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 int ffencoder_write_video_frame(void *ctxt, AVPacket *pkt)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
-    return write_frame(encoder, &encoder->vstream->codec->time_base, encoder->vstream, pkt);
+    AVRational tbms    = { 1, 1000 };
+    return write_frame(encoder, &tbms, encoder->vstream, pkt);
 }
 
