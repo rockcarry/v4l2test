@@ -78,8 +78,7 @@ cd ffmpeg
 --enable-encoder=aac \
 --enable-encoder=mjpeg \
 --enable-decoder=mjpeg \
---enable-muxer=flv \
---enable-muxer=mp4 \
+--enable-muxer=avi \
 --enable-protocol=file \
 --enable-protocol=rtmp \
 --disable-swscale-alpha \
