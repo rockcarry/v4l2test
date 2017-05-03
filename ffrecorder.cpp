@@ -294,8 +294,10 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
     char       *dev_name = NULL;
     int         sub_src  = 0;
+    sp<ANativeWindow> win= NULL;
     if (!recorder || camidx < 0 || camidx >= MAX_CAMDEV_NUM) return;
 
+    win = camdev_get_preview_window(recorder->camdev[camidx]);
     camdev_capture_stop(recorder->camdev[camidx]);
     camdev_close(recorder->camdev[camidx]);
 
@@ -325,6 +327,7 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
     recorder->camdev[camidx] = camdev_init(dev_name, sub_src, w, h, frate);
     camdev_capture_start(recorder->camdev[camidx]);
     camdev_set_callback(recorder->camdev[camidx], (void*)(camidx ? camdev1_capture_callback_proc : camdev0_capture_callback_proc), recorder);
+    camdev_set_preview_window(recorder->camdev[camidx], win);
 }
 
 void ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win)

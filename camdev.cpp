@@ -468,6 +468,13 @@ void camdev_set_preview_target(void *ctxt, const sp<IGraphicBufferProducer>& gbp
     camdev_set_preview_window(cam, win);
 }
 
+sp<ANativeWindow> camdev_get_preview_window(void *ctxt)
+{
+    CAMDEV *cam = (CAMDEV*)ctxt;
+    if (!cam) return NULL;
+    return cam->cur_win;
+}
+
 void camdev_capture_start(void *ctxt)
 {
     CAMDEV *cam = (CAMDEV*)ctxt;
