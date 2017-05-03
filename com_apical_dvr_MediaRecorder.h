@@ -24,10 +24,10 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeInitCallback
 /*
  * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeInit
- * Signature: ()J
+ * Signature: (IIII)J
  */
 JNIEXPORT jlong JNICALL Java_com_apical_dvr_MediaRecorder_nativeInit
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jint, jint, jint, jint);
 
 /*
  * Class:     com_apical_dvr_MediaRecorder

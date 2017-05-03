@@ -13,8 +13,8 @@ public class MediaRecorder {
 
     private long mRecorderContext;
 
-    public void init() {
-        mRecorderContext = nativeInit();
+    public void init(int cam_main_w, int cam_main_h, int cam_usb_w, int cam_usb_h) {
+        mRecorderContext = nativeInit(cam_main_w, cam_main_h, cam_usb_w, cam_usb_h);
         nativeInitCallback(mRecorderContext);
     }
 
@@ -91,7 +91,7 @@ public class MediaRecorder {
     //-- for take photo callback
 
 
-    private static native long nativeInit();
+    private static native long nativeInit(int cam_main_w, int cam_main_h, int cam_usb_w, int cam_usb_h);
     private static native void nativeFree(long ctxt);
 
     private static native int  nativeGetMicMute (long ctxt, int micidx);

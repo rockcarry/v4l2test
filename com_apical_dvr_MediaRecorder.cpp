@@ -61,12 +61,18 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeInitCallback
 /*
  * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeInit
- * Signature: ()J
+ * Signature: (IIII)J
  */
 JNIEXPORT jlong JNICALL Java_com_apical_dvr_MediaRecorder_nativeInit
-  (JNIEnv *env, jclass clazz)
+  (JNIEnv *env, jclass clazz, jint cam_main_w, jint cam_main_h, jint cam_usb_w, jint cam_usb_h)
 {
-    return (jlong)ffrecorder_init(NULL, env);
+    FFRECORDER_PARAMS params;
+    memset(&params, 0, sizeof(params));
+    params.cam_frame_width_0  = cam_main_w;
+    params.cam_frame_height_0 = cam_main_h;
+    params.cam_frame_width_1  = cam_usb_w;
+    params.cam_frame_height_1 = cam_usb_h;
+    return (jlong)ffrecorder_init(&params, env);
 }
 
 /*
