@@ -85,9 +85,9 @@ namespace android
 // 内部类型定义
 // h264hwenc context
 typedef struct {
-    void                     *ffencoder;
-    android::IH264EncService *cs;
-    int                       handle;
+    void                          *ffencoder;
+    android::sp<android::IH264EncService> cs;
+    int                               handle;
 } H264ENC;
 
 // 函数实现
@@ -104,7 +104,7 @@ void *h264hwenc_mediaserver_init(int iw, int ih, int ow, int oh, int frate, int 
     android::sp<android::IH264EncService> cs     = android::interface_cast<android::IH264EncService>(binder);
 
     enc->ffencoder = ffencoder;
-    enc->cs        = cs.get();
+    enc->cs        = cs;
     enc->handle    = cs->init(iw, ih, ow, oh, frate, bitrate);
     return enc;
 }
