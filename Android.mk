@@ -144,7 +144,7 @@ LOCAL_SRC_FILES := \
     h264hwenc_mediacodec.cpp \
     h264hwenc_cedarx.cpp \
     h264hwenc_mediaserver.cpp \
-    micdev_android.cpp \
+    micdev_audiorecord_native.cpp \
     camdev.cpp \
     ffjpeg.cpp \
     ffencoder.cpp \
@@ -158,6 +158,7 @@ LOCAL_SHARED_LIBRARIES := \
     libui \
     libgui \
     libandroid_runtime \
+    libmedia \
     libion_alloc \
     libcedarxosal \
     libaw_h264enc
