@@ -34,8 +34,8 @@ typedef struct {
     struct v4l2_buffer      buf;
     struct video_buffer     vbs[VIDEO_CAPTURE_BUFFER_COUNT];
     int                     fd;
-    sp<ANativeWindow>       new_win;
-    sp<ANativeWindow>       cur_win;
+    ANativeWindow          *new_win;
+    ANativeWindow          *cur_win;
     int                     win_w;
     int                     win_h;
     #define CAMDEV_TS_EXIT       (1 << 0)
@@ -143,11 +143,11 @@ static void* camdev_capture_thread_proc(void *param)
         if (cam->update_flag) {
             cam->cur_win = cam->new_win;
             if (cam->cur_win != NULL) {
-                native_window_set_usage             (cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
-                native_window_set_scaling_mode      (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-                native_window_set_buffer_count      (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
-                native_window_set_buffers_format    (cam->cur_win.get(), DEF_WIN_PIX_FMT);
-                native_window_set_buffers_dimensions(cam->cur_win.get(), cam->cam_w, cam->cam_h);
+                native_window_set_usage             (cam->cur_win, CAMDEV_GRALLOC_USAGE);
+                native_window_set_scaling_mode      (cam->cur_win, NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
+                native_window_set_buffer_count      (cam->cur_win, NATIVE_WIN_BUFFER_COUNT);
+                native_window_set_buffers_format    (cam->cur_win, DEF_WIN_PIX_FMT);
+                native_window_set_buffers_dimensions(cam->cur_win, cam->cam_w, cam->cam_h);
             }
             cam->update_flag = 0;
         }
@@ -178,7 +178,7 @@ static void* camdev_capture_thread_proc(void *param)
             int   len  = cam->buf.bytesused;
 
             ANativeWindowBuffer *buf;
-            if (cam->cur_win != NULL && 0 == native_window_dequeue_buffer_and_wait(cam->cur_win.get(), &buf)) {
+            if (cam->cur_win != NULL && 0 == native_window_dequeue_buffer_and_wait(cam->cur_win, &buf)) {
                 GraphicBufferMapper &mapper = GraphicBufferMapper::get();
                 Rect bounds(buf->width, buf->height);
                 void *dst = NULL;
@@ -190,7 +190,7 @@ static void* camdev_capture_thread_proc(void *param)
                     mapper.unlock(buf->handle);
                 }
 
-                if ((err = cam->cur_win->queueBuffer(cam->cur_win.get(), buf, -1)) != 0) {
+                if ((err = cam->cur_win->queueBuffer(cam->cur_win, buf, -1)) != 0) {
                     ALOGW("Surface::queueBuffer returned error %d\n", err);
                 }
             }
@@ -450,7 +450,7 @@ void camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win)
 {
     CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
-    cam->new_win     = win;
+    cam->new_win     = win.get();
     cam->update_flag = 1;
 }
 
