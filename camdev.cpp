@@ -286,9 +286,11 @@ static int v4l2_try_fmt_size(int fd, int fmt, int *width, int *height)
 // 函数实现
 void* camdev_init(const char *dev, int sub, int w, int h, int frate)
 {
-    CAMDEV *cam = (CAMDEV*)calloc(1, sizeof(CAMDEV));
+    CAMDEV *cam = new CAMDEV();
     if (!cam) {
         return NULL;
+    } else {
+        memset(cam, 0, sizeof(CAMDEV));
     }
 
     // open camera device
@@ -443,7 +445,7 @@ void camdev_close(void *ctxt)
 
     // close & free
     close(cam->fd);
-    free(cam);
+    delete cam;
 }
 
 void camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win)

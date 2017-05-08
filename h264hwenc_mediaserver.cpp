@@ -93,7 +93,7 @@ typedef struct {
 // º¯ÊýÊµÏÖ
 void *h264hwenc_mediaserver_init(int iw, int ih, int ow, int oh, int frate, int bitrate, void *ffencoder)
 {
-    H264ENC *enc = (H264ENC*)calloc(1, sizeof(H264ENC));
+    H264ENC *enc = new H264ENC();
     if (!enc) {
         ALOGE("failed to allocate h264hwenc context !\n");
         return NULL;
@@ -116,7 +116,7 @@ void h264hwenc_mediaserver_close(void *ctxt)
 
     enc->cs->close(enc->handle);
     enc->cs = NULL;
-    free(enc);
+    delete enc;
 }
 
 int h264hwenc_mediaserver_picture_format(void *ctxt)
