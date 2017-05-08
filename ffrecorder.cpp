@@ -173,7 +173,7 @@ void *ffrecorder_init(FFRECORDER_PARAMS *params, void *extra)
     // using default params if not set
     if (!params                      ) params                       =&DEF_FFRECORDER_PARAMS;
     if (!params->mic_sample_rate     ) params->mic_sample_rate      = DEF_FFRECORDER_PARAMS.mic_sample_rate;
-    if (!params->mic_sample_rate     ) params->mic_channel_num      = DEF_FFRECORDER_PARAMS.mic_channel_num;
+    if (!params->mic_channel_num     ) params->mic_channel_num      = DEF_FFRECORDER_PARAMS.mic_channel_num;
     if (!params->cam_dev_name_0      ) params->cam_dev_name_0       = DEF_FFRECORDER_PARAMS.cam_dev_name_0;
     if (!params->cam_sub_src_0       ) params->cam_sub_src_0        = DEF_FFRECORDER_PARAMS.cam_sub_src_0;
     if (!params->cam_frame_width_0   ) params->cam_frame_width_0    = DEF_FFRECORDER_PARAMS.cam_frame_width_0;

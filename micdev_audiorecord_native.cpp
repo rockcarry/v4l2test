@@ -51,8 +51,7 @@ static void* micdev_capture_thread_proc(void *param)
 // 函数实现
 void* micdev_android_init(int samprate, int channels, void *extra)
 {
-    int   chcfg = channels == 2 ? AUDIO_CHANNEL_OUT_STEREO : AUDIO_CHANNEL_OUT_MONO;
-//  MICDEV *mic = (MICDEV*)calloc(1, sizeof(MICDEV));
+    int   chcfg = channels == 2 ? AUDIO_CHANNEL_IN_STEREO : AUDIO_CHANNEL_IN_MONO;
     MICDEV *mic = new MICDEV();
     if (!mic) {
         ALOGE("failed to allocate micdev context !\n");
@@ -69,7 +68,7 @@ void* micdev_android_init(int samprate, int channels, void *extra)
         &minfcount, samprate, AUDIO_FORMAT_PCM_16_BIT, chcfg); 
     mic->buflen = minfcount * channels * 2;
     mic->buffer = new uint8_t[mic->buflen];
-    mic->record = new android::AudioRecord(AUDIO_SOURCE_MIC, samprate, AUDIO_FORMAT_PCM_16_BIT, channels, minfcount);
+    mic->record = new android::AudioRecord(AUDIO_SOURCE_MIC, samprate, AUDIO_FORMAT_PCM_16_BIT, chcfg, minfcount);
 
     if (mic->record->initCheck() != android::NO_ERROR) {
         ALOGE("failed to init audio recorder of android !\n");
