@@ -104,14 +104,14 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
+        if (recorder->rsvpts[0] == -1) {
+            recorder->rsvpts[0] = pts;
+            pts  = 0;
+        } else {
+            pts -= recorder->rsvpts[0];
+        }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 0) {
-                if (recorder->rsvpts[0] == -1) {
-                    recorder->rsvpts[0] = pts;
-                    pts  = 0;
-                } else {
-                    pts -= recorder->rsvpts[0];
-                }
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
@@ -135,14 +135,14 @@ static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
+        if (recorder->rsvpts[1] == -1) {
+            recorder->rsvpts[1] = pts;
+            pts  = 0;
+        } else {
+            pts -= recorder->rsvpts[1];
+        }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->video_source[i] == 1) {
-                if (recorder->rsvpts[1] == -1) {
-                    recorder->rsvpts[1] = pts;
-                    pts  = 0;
-                } else {
-                    pts -= recorder->rsvpts[1];
-                }
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
