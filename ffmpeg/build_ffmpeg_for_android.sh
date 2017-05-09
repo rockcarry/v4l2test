@@ -79,6 +79,7 @@ cd ffmpeg
 --enable-encoder=mjpeg \
 --enable-decoder=mjpeg \
 --enable-muxer=avi \
+--enable-muxer=mp4 \
 --enable-protocol=file \
 --enable-protocol=rtmp \
 --disable-swscale-alpha \
