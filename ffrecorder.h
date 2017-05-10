@@ -41,7 +41,7 @@ typedef struct
     int   out_video_bitrate_0;
     int   out_video_width_0;
     int   out_video_height_0;
-    int   out_video_frate_0;
+    int   out_video_frate_0; // -1 means same as camdev input
 
     int   out_audio_bitrate_1;
     int   out_audio_chlayout_1;
@@ -57,7 +57,7 @@ typedef struct
     int   out_video_bitrate_2;
     int   out_video_width_2;
     int   out_video_height_2;
-    int   out_video_frate_2;
+    int   out_video_frate_2; // -1 means same as camdev input
 } FFRECORDER_PARAMS;
 
 // º¯Êı¶¨Òå

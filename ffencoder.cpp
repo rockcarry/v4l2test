@@ -112,7 +112,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     640,                        // in_video_width
     480,                        // in_video_height
     AV_PIX_FMT_YUYV422,         // in_video_pixfmt
-    30,                         // in_video_frame_rate
+    30,                         // in_video_frame_rate_num
+    1,                          // in_video_frame_rate_den
 
     // output params
     (char*)"/sdcard/test.mp4",  // filename
@@ -122,7 +123,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
     256000,                     // out_video_bitrate
     320,                        // out_video_width
     240,                        // out_video_height
-    20,                         // out_video_frame_rate
+    20,                         // out_video_frame_rate_num
+    1,                          // out_video_frame_rate_den
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
@@ -370,10 +372,10 @@ static int add_vstream(FFENCODER *encoder)
      * of which frame timestamps are represented. For fixed-fps content,
      * timebase should be 1/framerate and timestamp increments should be
      * identical to 1. */
-    encoder->vstream->time_base.num = 1;
-    encoder->vstream->time_base.den = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate : 1000;
+    encoder->vstream->time_base.num = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate_den : 1;
+    encoder->vstream->time_base.den = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate_num : 1000;
     c->time_base = encoder->vstream->time_base;
-    c->gop_size  = encoder->params.out_video_frame_rate;
+    c->gop_size  = encoder->params.out_video_frame_rate_num / encoder->params.out_video_frame_rate_den;
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
     if (c->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
         /* just for testing, we also add B frames */
@@ -611,7 +613,9 @@ static void close_vstream(FFENCODER *encoder)
 // º¯ÊýÊµÏÖ
 void* ffencoder_init(FFENCODER_PARAMS *params)
 {
-    int ret;
+    char *str;
+    int   len;
+    int   ret;
 
     // allocate context for ffencoder
     FFENCODER *encoder = (FFENCODER*)calloc(1, sizeof(FFENCODER));
@@ -627,7 +631,8 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->in_video_width          ) params->in_video_width          = DEF_FFENCODER_PARAMS.in_video_width;
     if (!params->in_video_height         ) params->in_video_height         = DEF_FFENCODER_PARAMS.in_video_height;
     if (!params->in_video_pixfmt         ) params->in_video_pixfmt         = DEF_FFENCODER_PARAMS.in_video_pixfmt;
-    if (!params->in_video_frame_rate     ) params->in_video_frame_rate     = DEF_FFENCODER_PARAMS.in_video_frame_rate;
+    if (!params->in_video_frame_rate_num ) params->in_video_frame_rate_num = DEF_FFENCODER_PARAMS.in_video_frame_rate_num;
+    if (!params->in_video_frame_rate_den ) params->in_video_frame_rate_den = DEF_FFENCODER_PARAMS.in_video_frame_rate_den;
     if (!params->out_filename            ) params->out_filename            = DEF_FFENCODER_PARAMS.out_filename;
     if (!params->out_audio_bitrate       ) params->out_audio_bitrate       = DEF_FFENCODER_PARAMS.out_audio_bitrate;
     if (!params->out_audio_channel_layout) params->out_audio_channel_layout= DEF_FFENCODER_PARAMS.out_audio_channel_layout;
@@ -635,12 +640,24 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->out_video_bitrate       ) params->out_video_bitrate       = DEF_FFENCODER_PARAMS.out_video_bitrate;
     if (!params->out_video_width         ) params->out_video_width         = DEF_FFENCODER_PARAMS.out_video_width;
     if (!params->out_video_height        ) params->out_video_height        = DEF_FFENCODER_PARAMS.out_video_height;
-    if (!params->out_video_frame_rate    ) params->out_video_frame_rate    = DEF_FFENCODER_PARAMS.out_video_frame_rate;
+    if (!params->out_video_frame_rate_num) params->out_video_frame_rate_num= DEF_FFENCODER_PARAMS.out_video_frame_rate_num;
+    if (!params->out_video_frame_rate_den) params->out_video_frame_rate_den= DEF_FFENCODER_PARAMS.out_video_frame_rate_den;
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
     if (!params->audio_buffer_number     ) params->audio_buffer_number     = DEF_FFENCODER_PARAMS.audio_buffer_number;
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
     if (!params->video_timebase_type     ) params->video_timebase_type     = DEF_FFENCODER_PARAMS.video_timebase_type;
     if (!params->video_encoder_type      ) params->video_encoder_type      = DEF_FFENCODER_PARAMS.video_encoder_type;
+
+    //++ for .avi file only support timebase by frame rate
+    len = strlen(params->out_filename);
+    if (len > 4) {
+        str = params->out_filename + len - 4;
+        if (strcasecmp(str, ".avi") == 0) {
+            params->video_timebase_type = 1;
+        }
+    }
+    //-- for .avi file only support timebase by frame rate
+
     memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
 
     /* initialize libavcodec, and register all codecs and formats. */
@@ -670,7 +687,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
             encoder->params.in_video_height,
             encoder->params.out_video_width,
             encoder->params.out_video_height,
-            encoder->params.out_video_frame_rate,
+            encoder->params.out_video_frame_rate_num / encoder->params.out_video_frame_rate_den,
             encoder->params.out_video_bitrate,
             encoder);
 #endif
@@ -719,7 +736,9 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     }
 
     // init frame dropper
-    frame_dropper_init(&encoder->vdropper, params->in_video_frame_rate, params->out_video_frame_rate);
+    frame_dropper_init(&encoder->vdropper,
+        params->in_video_frame_rate_num / params->in_video_frame_rate_den,
+        params->out_video_frame_rate_num/ params->out_video_frame_rate_den);
 
     // successed
     return encoder;

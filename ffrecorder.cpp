@@ -72,7 +72,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     5000000,                    // out_video_bitrate_1
     1280,                       // out_video_width_1
     720,                        // out_video_height_1
-    25,                         // out_video_frate_1
+    -1,                         // out_video_frate_1
 
     // ffencoder output
     16000,                      // out_audio_bitrate_2
@@ -81,7 +81,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     2000000,                    // out_video_bitrate_2
     640,                        // out_video_width_2
     480,                        // out_video_height_2
-    25,                         // out_video_frate_2
+    -1,                         // out_video_frate_2
 };
 
 // 内部函数实现
@@ -423,7 +423,8 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.in_video_width          = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_WIDTH );
     encoder_params.in_video_height         = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_HEIGHT);
     encoder_params.in_video_pixfmt         = v4l2dev_pixfmt_to_ffmpeg_pixfmt(camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT));
-    encoder_params.in_video_frame_rate     = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE );
+    encoder_params.in_video_frame_rate_num = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE_NUM);
+    encoder_params.in_video_frame_rate_den = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_FRATE_DEN);
     encoder_params.out_filename            = filename;
     encoder_params.out_audio_bitrate       = abitrate;
     encoder_params.out_audio_channel_layout= achlayout;
@@ -431,11 +432,12 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.out_video_bitrate       = vbitrate;
     encoder_params.out_video_width         = vwidth;
     encoder_params.out_video_height        = vheight;
-    encoder_params.out_video_frame_rate    = vfrate;
+    encoder_params.out_video_frame_rate_num= vfrate == -1 ? encoder_params.in_video_frame_rate_num : vfrate;
+    encoder_params.out_video_frame_rate_den= vfrate == -1 ? encoder_params.in_video_frame_rate_den : 1;
     encoder_params.scale_flags             = 0; // use default
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
-    encoder_params.video_timebase_type     = 1; // timebase by frame rate
+    encoder_params.video_timebase_type     = 0; // timebase by ms
 #ifdef ENABLE_H264_HWENC
     encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 1;
 #else

@@ -20,7 +20,8 @@ typedef struct
     int   in_video_width;
     int   in_video_height;
     int   in_video_pixfmt;
-    int   in_video_frame_rate;
+    int   in_video_frame_rate_num;
+    int   in_video_frame_rate_den;
 
     // output params
     char *out_filename;
@@ -30,7 +31,8 @@ typedef struct
     int   out_video_bitrate;
     int   out_video_width;
     int   out_video_height;
-    int   out_video_frame_rate;
+    int   out_video_frame_rate_num;
+    int   out_video_frame_rate_den;
 
     // other params
     int   scale_flags;

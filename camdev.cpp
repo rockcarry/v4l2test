@@ -48,7 +48,8 @@ typedef struct {
     int                     cam_stride;
     int                     cam_w;
     int                     cam_h;
-    int                     cam_frate; // camdev frame rate get from v4l2 interface
+    int                     cam_frate_num; // camdev frame rate num get from v4l2 interface
+    int                     cam_frate_den; // camdev frame rate den get from v4l2 interface
     SwsContext             *swsctxt;
     CAMDEV_CAPTURE_CALLBACK callback;
     void                   *recorder;
@@ -378,10 +379,8 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         ALOGD("current camera frame rate: %d/%d !\n",
             streamparam.parm.capture.timeperframe.denominator,
             streamparam.parm.capture.timeperframe.numerator );
-        cam->cam_frate = (int)( streamparam.parm.capture.timeperframe.denominator
-                              / streamparam.parm.capture.timeperframe.numerator);
-        cam->cam_frate = 30; // assume camera frame rate is 30fps
-        ALOGD("assume camera frame rate is 30fps !\n");
+        cam->cam_frate_num = streamparam.parm.capture.timeperframe.denominator;
+        cam->cam_frate_den = streamparam.parm.capture.timeperframe.numerator;
     }
     else {
         ALOGW("failed to set camera frame rate !\n");
@@ -545,8 +544,10 @@ int camdev_get_param(void *ctxt, int id)
         return cam->cam_h;
     case CAMDEV_PARAM_VIDEO_PIXFMT:
         return cam->cam_pixfmt;
-    case CAMDEV_PARAM_VIDEO_FRATE:
-        return cam->cam_frate;
+    case CAMDEV_PARAM_VIDEO_FRATE_NUM:
+        return cam->cam_frate_num;
+    case CAMDEV_PARAM_VIDEO_FRATE_DEN:
+        return cam->cam_frate_den;
     }
     return 0;
 }
