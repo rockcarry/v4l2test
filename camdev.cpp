@@ -139,17 +139,19 @@ static void* camdev_capture_thread_proc(void *param)
     //-- for select
 
     while (!(cam->thread_state & CAMDEV_TS_EXIT)) {
-        if (cam->thread_state & CAMDEV_TS_PAUSE) {
-            usleep(10*1000);
-            continue;
-        }
-
         FD_ZERO(&fds);
         FD_SET (cam->fd, &fds);
         tv.tv_sec  = 1;
         tv.tv_usec = 0;
         if (select(cam->fd + 1, &fds, NULL, NULL, &tv) <= 0) {
             ALOGD("select error or timeout !\n");
+            continue;
+        }
+
+        if (cam->thread_state & CAMDEV_TS_EXIT) {
+            break;
+        } else if (cam->thread_state & CAMDEV_TS_PAUSE) {
+            usleep(10*1000);
             continue;
         }
 
@@ -194,6 +196,7 @@ static void* camdev_capture_thread_proc(void *param)
         }
     }
 
+//  ALOGD("camdev_capture_thread_proc exited !");
     return NULL;
 }
 
@@ -203,9 +206,13 @@ static void* camdev_render_thread_proc(void *param)
     int      err;
 
     while (!(cam->thread_state & CAMDEV_TS_EXIT)) {
-        if (0 != sem_trywait(&cam->sem_render)) {
-            usleep(10*1000);
-            continue;
+        if (0 != sem_wait(&cam->sem_render)) {
+            ALOGD("failed to wait sem_render !\n");
+            break;
+        }
+
+        if (cam->thread_state & CAMDEV_TS_EXIT) {
+            break;
         }
 
         if (cam->update_flag) {
@@ -243,6 +250,7 @@ static void* camdev_render_thread_proc(void *param)
         }
     }
 
+//  ALOGD("camdev_render_thread_proc exited !");
     return NULL;
 }
 
@@ -450,7 +458,7 @@ void camdev_close(void *ctxt)
     if (!cam) return;
 
     // wait thread safely exited
-    cam->thread_state |= CAMDEV_TS_EXIT;
+    cam->thread_state |= CAMDEV_TS_EXIT; sem_post(&cam->sem_render);
     pthread_join(cam->thread_id_capture, NULL);
     pthread_join(cam->thread_id_render , NULL);
 
