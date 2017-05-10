@@ -42,7 +42,7 @@ static void* micdev_capture_thread_proc(void *param)
         }
 
         // sleep to release cpu
-        usleep(10*1000);
+//      usleep(10*1000); // no need this
     }
 
     return NULL;
