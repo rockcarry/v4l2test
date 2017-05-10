@@ -721,7 +721,9 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
 
     /* open the output file, if needed */
     if (!(encoder->ofctxt->oformat->flags & AVFMT_NOFILE)) {
-        ret = avio_open(&encoder->ofctxt->pb, params->out_filename, AVIO_FLAG_WRITE);
+        AVDictionary *param = NULL;
+        av_dict_set_int(&param, "blocksize", 256*1024, AV_OPT_FLAG_ENCODING_PARAM);
+        ret = avio_open2(&encoder->ofctxt->pb, params->out_filename, AVIO_FLAG_WRITE, NULL, &param);
         if (ret < 0) {
             printf("could not open '%s' !\n", params->out_filename);
             goto failed;
