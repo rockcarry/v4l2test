@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <utils/Log.h>
 #include "ffutils.h"
 #include "ffjpeg.h"
@@ -41,7 +42,9 @@ typedef struct {
     #define CAMDEV_TS_EXIT       (1 << 0)
     #define CAMDEV_TS_PAUSE      (1 << 1)
     #define CAMDEV_TS_PREVIEW    (1 << 2)
-    pthread_t               thread_id;
+    sem_t                   sem_render;
+    pthread_t               thread_id_render;
+    pthread_t               thread_id_capture;
     int                     thread_state;
     int                     update_flag;
     int                     cam_pixfmt;
@@ -141,18 +144,6 @@ static void* camdev_capture_thread_proc(void *param)
             continue;
         }
 
-        if (cam->update_flag) {
-            cam->cur_win = cam->new_win;
-            if (cam->cur_win != NULL) {
-                native_window_set_usage             (cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
-                native_window_set_scaling_mode      (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-                native_window_set_buffer_count      (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
-                native_window_set_buffers_format    (cam->cur_win.get(), DEF_WIN_PIX_FMT);
-                native_window_set_buffers_dimensions(cam->cur_win.get(), cam->cam_w, cam->cam_h);
-            }
-            cam->update_flag = 0;
-        }
-
         FD_ZERO(&fds);
         FD_SET (cam->fd, &fds);
         tv.tv_sec  = 1;
@@ -172,29 +163,8 @@ static void* camdev_capture_thread_proc(void *param)
 //              cam->buf.sequence, cam->buf.length);
 //      ALOGD("timestamp: %ld, %ld\n", cam->buf.timestamp.tv_sec, cam->buf.timestamp.tv_usec);
 
-        if (cam->thread_state & CAMDEV_TS_PREVIEW)
-        {
-            int   pts  = (int)(cam->buf.timestamp.tv_usec + cam->buf.timestamp.tv_sec * 1000000);
-            char *data = (char*)cam->vbs[cam->buf.index].addr;
-            int   len  = cam->buf.bytesused;
-
-            ANativeWindowBuffer *buf;
-            if (cam->cur_win != NULL && 0 == native_window_dequeue_buffer_and_wait(cam->cur_win.get(), &buf)) {
-                GraphicBufferMapper &mapper = GraphicBufferMapper::get();
-                Rect bounds(buf->width, buf->height);
-                void *dst = NULL;
-
-                if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
-                    render_v4l2(cam,
-                        dst , -1 , buf->format    , buf->width, buf->height,
-                        data, len, cam->cam_pixfmt, cam->cam_w, cam->cam_h, pts);
-                    mapper.unlock(buf->handle);
-                }
-
-                if ((err = cam->cur_win->queueBuffer(cam->cur_win.get(), buf, -1)) != 0) {
-                    ALOGW("Surface::queueBuffer returned error %d\n", err);
-                }
-            }
+        if (cam->thread_state & CAMDEV_TS_PREVIEW) {
+            sem_post(&cam->sem_render);
         }
 
         if (cam->callback) {
@@ -221,6 +191,55 @@ static void* camdev_capture_thread_proc(void *param)
         // requeue camera video buffer
         if (-1 == ioctl(cam->fd, VIDIOC_QBUF , &cam->buf)) {
             ALOGD("failed to en-queue buffer !\n");
+        }
+    }
+
+    return NULL;
+}
+
+static void* camdev_render_thread_proc(void *param)
+{
+    CAMDEV  *cam = (CAMDEV*)param;
+    int      err;
+
+    while (!(cam->thread_state & CAMDEV_TS_EXIT)) {
+        if (0 != sem_trywait(&cam->sem_render)) {
+            usleep(10*1000);
+            continue;
+        }
+
+        if (cam->update_flag) {
+            cam->cur_win = cam->new_win;
+            if (cam->cur_win != NULL) {
+                native_window_set_usage             (cam->cur_win.get(), CAMDEV_GRALLOC_USAGE);
+                native_window_set_scaling_mode      (cam->cur_win.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
+                native_window_set_buffer_count      (cam->cur_win.get(), NATIVE_WIN_BUFFER_COUNT);
+                native_window_set_buffers_format    (cam->cur_win.get(), DEF_WIN_PIX_FMT);
+                native_window_set_buffers_dimensions(cam->cur_win.get(), cam->cam_w, cam->cam_h);
+            }
+            cam->update_flag = 0;
+        }
+
+        int   pts  = (int)(cam->buf.timestamp.tv_usec + cam->buf.timestamp.tv_sec * 1000000);
+        char *data = (char*)cam->vbs[cam->buf.index].addr;
+        int   len  = cam->buf.bytesused;
+
+        ANativeWindowBuffer *buf;
+        if (cam->cur_win != NULL && 0 == native_window_dequeue_buffer_and_wait(cam->cur_win.get(), &buf)) {
+            GraphicBufferMapper &mapper = GraphicBufferMapper::get();
+            Rect bounds(buf->width, buf->height);
+            void *dst = NULL;
+
+            if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
+                render_v4l2(cam,
+                    dst , -1 , buf->format    , buf->width, buf->height,
+                    data, len, cam->cam_pixfmt, cam->cam_w, cam->cam_h, pts);
+                mapper.unlock(buf->handle);
+            }
+
+            if ((err = cam->cur_win->queueBuffer(cam->cur_win.get(), buf, -1)) != 0) {
+                ALOGW("Surface::queueBuffer returned error %d\n", err);
+            }
         }
     }
 
@@ -413,8 +432,14 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
     // set test frame rate flag
     cam->thread_state |= CAMDEV_TS_PAUSE;
 
+    // create sem_render
+    sem_init(&cam->sem_render, 0, 0);
+
     // create capture thread
-    pthread_create(&cam->thread_id, NULL, camdev_capture_thread_proc, cam);
+    pthread_create(&cam->thread_id_capture, NULL, camdev_capture_thread_proc, cam);
+
+    // create render thread
+    pthread_create(&cam->thread_id_render , NULL, camdev_render_thread_proc , cam);
 
     return cam;
 }
@@ -426,7 +451,8 @@ void camdev_close(void *ctxt)
 
     // wait thread safely exited
     cam->thread_state |= CAMDEV_TS_EXIT;
-    pthread_join(cam->thread_id, NULL);
+    pthread_join(cam->thread_id_capture, NULL);
+    pthread_join(cam->thread_id_render , NULL);
 
     if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
         ffjpeg_decoder_free(cam->jpegdec);
