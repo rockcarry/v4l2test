@@ -205,14 +205,8 @@ int h264hwenc_cedarx_encode(void *ctxt, AVFrame *frame, int timeout)
         memcpy(enc->output_buf + offset, datainfo.pData0, datainfo.uSize0); offset += datainfo.uSize0;
         memcpy(enc->output_buf + offset, datainfo.pData1, datainfo.uSize1); offset += datainfo.uSize1;
 
-        AVPacket pkt;
-        memset(&pkt, 0, sizeof(pkt));
-        pkt.flags |= datainfo.keyFrameFlag ? AV_PKT_FLAG_KEY : 0;
-        pkt.data   = enc->output_buf;
-        pkt.size   = offset;
-        pkt.pts    = frame->pts;
-        pkt.dts    = frame->pts;
-        ffencoder_write_video_frame(enc->ffencoder, &pkt);
+        int flags = datainfo.keyFrameFlag ? AV_PKT_FLAG_KEY : 0;
+        ffencoder_write_video_frame(enc->ffencoder, flags, enc->output_buf, offset, frame->pts);
     }
 
     // release bit stream

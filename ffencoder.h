@@ -49,7 +49,7 @@ void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
 int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts);
 int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts);
-int   ffencoder_write_video_frame(void *ctxt, AVPacket *pkt);
+int   ffencoder_write_video_frame(void *ctxt, int flags, void *data, int size, int64_t pts);
 
 #ifdef __cplusplus
 }

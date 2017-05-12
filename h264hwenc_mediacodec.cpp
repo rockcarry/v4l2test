@@ -131,16 +131,9 @@ int h264hwenc_mediacodec_encode(void *ctxt, AVFrame *frame, int timeout)
     jbyteArray array = (jbyteArray)env->CallObjectMethod(enc->object, enc->dequeue, timeout);
     if (!array) return -1;
 
-    uint8_t* buffer = (uint8_t*)env->GetByteArrayElements(array, 0);
-
-    AVPacket pkt;
-    memset(&pkt, 0, sizeof(pkt));
-    pkt.flags |= buffer[4] == 0x67 ? AV_PKT_FLAG_KEY : 0;
-    pkt.data   = buffer;
-    pkt.size   = env->GetArrayLength(array);
-    pkt.pts    = frame->pts;
-    pkt.dts    = frame->pts;
-    ffencoder_write_video_frame(enc->ffencoder, &pkt);
+    uint8_t *buffer = (uint8_t*)env->GetByteArrayElements(array, 0);
+    int      flags  = buffer[4] == 0x67 ? AV_PKT_FLAG_KEY : 0;
+    ffencoder_write_video_frame(enc->ffencoder, flags, buffer, env->GetArrayLength(array), frame->pts);
 
     env->ReleaseByteArrayElements(array, (jbyte*)buffer, 0);
     env->DeleteLocalRef(array);

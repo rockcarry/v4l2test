@@ -63,18 +63,10 @@ namespace android
             data.writeInt32(timeout);
             remote()->transact(ENCODE, data, &reply);
 
-            key = reply.readInt32();
+            key = reply.readInt32() ? AV_PKT_FLAG_KEY : 0;
             len = reply.readInt32();
             buf = (uint8_t*)reply.readInplace(len);
-
-            AVPacket pkt;
-            memset(&pkt, 0, sizeof(pkt));
-            pkt.flags |= key ? AV_PKT_FLAG_KEY : 0;
-            pkt.data   = buf;
-            pkt.size   = len;
-            pkt.pts    = pts;
-            pkt.dts    = pts;
-            ffencoder_write_video_frame(param, &pkt);
+            ffencoder_write_video_frame(param, key, buf, len, pts);
             return len;
         }
     };
