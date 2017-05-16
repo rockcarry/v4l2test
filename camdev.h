@@ -34,6 +34,7 @@ void  camdev_capture_start(void *ctxt);
 void  camdev_capture_stop (void *ctxt);
 void  camdev_preview_start(void *ctxt);
 void  camdev_preview_stop (void *ctxt);
+void  camdev_set_watermark(void *ctxt, int x, int y, const char *wm);
 void  camdev_set_callback (void *ctxt, void *callback, void *recorder);
 void  camdev_set_param    (void *ctxt, int id, int value);
 int   camdev_get_param    (void *ctxt, int id);

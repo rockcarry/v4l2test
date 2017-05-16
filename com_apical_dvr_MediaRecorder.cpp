@@ -121,6 +121,19 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeResetCamera
 
 /*
  * Class:     com_apical_dvr_MediaRecorder
+ * Method:    nativeSetWatermark
+ * Signature: (JIIILjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetWatermark
+  (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jint x, jint y, jstring watermark)
+{
+    const char *str = env->GetStringUTFChars(watermark, NULL);
+    ffrecorder_set_watermark((void*)ctxt, camidx, x, y, (char*)str);
+    env->ReleaseStringUTFChars(watermark, str);
+}
+
+/*
+ * Class:     com_apical_dvr_MediaRecorder
  * Method:    nativeSetPreviewWindow
  * Signature: (JILjava/lang/Object;)V
  */

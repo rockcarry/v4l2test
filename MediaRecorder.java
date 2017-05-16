@@ -36,6 +36,10 @@ public class MediaRecorder {
         nativeResetCamera(mRecorderContext, camidx, w, h, frate);
     }
 
+    public void setWatermark(int camidx, int x, int y, String watermark) {
+        nativeSetWatermark(mRecorderContext, camidx, x, y, watermark);
+    }
+
     public void setPreviewDisplay(int camidx, Object win) {
         nativeSetPreviewWindow(mRecorderContext, camidx, win);
     }
@@ -96,7 +100,9 @@ public class MediaRecorder {
 
     private static native int  nativeGetMicMute (long ctxt, int micidx);
     private static native void nativeSetMicMute (long ctxt, int micidx, int mute);
-    private static native void nativeResetCamera(long ctxt, int camidx, int w, int h, int frate);
+
+    private static native void nativeResetCamera (long ctxt, int camidx, int w, int h, int frate);
+    private static native void nativeSetWatermark(long ctxt, int camidx, int x, int y, String watermark);
 
     private static native void nativeSetPreviewWindow(long ctxt, int camidx, Object win);
     private static native void nativeSetPreviewTarget(long ctxt, int camidx, Object win);

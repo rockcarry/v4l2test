@@ -66,6 +66,7 @@ void  ffrecorder_free(void *ctxt);
 int   ffrecorder_get_mic_mute  (void *ctxt, int micidx);
 void  ffrecorder_set_mic_mute  (void *ctxt, int micidx, int mute);
 void  ffrecorder_reset_camdev  (void *ctxt, int camidx, int w, int h, int frate);
+void  ffrecorder_set_watermark (void *ctxt, int camidx, int x, int y, char *watermark);
 void  ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win);
 void  ffrecorder_preview_target(void *ctxt, int camidx, const sp<IGraphicBufferProducer>& gbp);
 void  ffrecorder_preview_start (void *ctxt, int camidx);

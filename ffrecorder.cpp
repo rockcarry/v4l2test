@@ -330,6 +330,13 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
     camdev_set_preview_window(recorder->camdev[camidx], win);
 }
 
+void ffrecorder_set_watermark(void *ctxt, int camidx, int x, int y, char *watermark)
+{
+    FFRECORDER *recorder = (FFRECORDER*)ctxt;
+    if (!recorder || camidx < 0 || camidx >= MAX_CAMDEV_NUM) return;
+    camdev_set_watermark(recorder->camdev[camidx], x, y, watermark);
+}
+
 void ffrecorder_preview_window(void *ctxt, int camidx, const sp<ANativeWindow> win)
 {
     FFRECORDER *recorder = (FFRECORDER*)ctxt;

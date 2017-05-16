@@ -9,6 +9,7 @@
 #include <utils/Log.h>
 #include "ffutils.h"
 #include "ffjpeg.h"
+#include "watermark.h"
 #include "camdev.h"
 
 extern "C" {
@@ -57,6 +58,11 @@ typedef struct {
     CAMDEV_CAPTURE_CALLBACK callback;
     void                   *recorder;
     void                   *jpegdec;
+
+    #define MAX_WATERMARK_SIZE  64
+    int                     watermark_x;
+    int                     watermark_y;
+    char                    watermark_str[MAX_WATERMARK_SIZE];
 } CAMDEV;
 
 // 内部函数实现
@@ -159,6 +165,10 @@ static void* camdev_capture_thread_proc(void *param)
         if (-1 == ioctl(cam->fd, VIDIOC_DQBUF, &cam->buf)) {
             ALOGD("failed to de-queue buffer !\n");
             continue;
+        }
+
+        if (cam->watermark_str[0]) {
+            watermark_putstring(cam->vbs[cam->buf.index].addr, cam->cam_w, cam->cam_h, cam->watermark_x, cam->watermark_y, cam->watermark_str);
         }
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
@@ -552,6 +562,16 @@ void camdev_preview_stop(void *ctxt)
     if (!cam) return;
     // set stop prevew flag
     cam->thread_state &= ~CAMDEV_TS_PREVIEW;
+}
+
+void camdev_set_watermark(void *ctxt, int x, int y, const char *wm)
+{
+    CAMDEV *cam = (CAMDEV*)ctxt;
+    if (!cam) return;
+    cam->watermark_x = x;
+    cam->watermark_y = y;
+    strncpy(cam->watermark_str, wm, MAX_WATERMARK_SIZE - 1);
+    cam->watermark_str[MAX_WATERMARK_SIZE - 1] = '\0';
 }
 
 void camdev_set_callback(void *ctxt, void *callback, void *recorder)
