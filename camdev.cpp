@@ -16,6 +16,12 @@ extern "C" {
 #include "libswscale/swscale.h"
 }
 
+#ifdef PLATFORM_ALLWINNER_A33
+extern "C" int  ion_alloc_open (void);
+extern "C" int  ion_alloc_close(void);
+extern "C" void ion_flush_cache(void *pbuf, int size);
+#endif
+
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
 #define VIDEO_CAPTURE_BUFFER_COUNT  5
@@ -169,6 +175,9 @@ static void* camdev_capture_thread_proc(void *param)
 
         if (cam->watermark_str[0]) {
             watermark_putstring(cam->vbs[cam->buf.index].addr, cam->cam_w, cam->cam_h, cam->watermark_x, cam->watermark_y, cam->watermark_str);
+#ifdef PLATFORM_ALLWINNER_A33
+            ion_flush_cache(cam->vbs[cam->buf.index].addr, cam->buf.bytesused);
+#endif
         }
 
 //      ALOGD("%d. bytesused: %d, sequence: %d, length = %d\n", cam->buf.index, cam->buf.bytesused,
@@ -331,6 +340,10 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         memset(cam, 0, sizeof(CAMDEV));
     }
 
+#ifdef PLATFORM_ALLWINNER_A33
+    ion_alloc_open();
+#endif
+
     // open camera device
     cam->fd = open(dev, O_RDWR | O_NONBLOCK);
     if (cam->fd < 0) {
@@ -489,6 +502,10 @@ void camdev_close(void *ctxt)
     // close & free
     close(cam->fd);
     delete cam;
+
+#ifdef PLATFORM_ALLWINNER_A33
+    ion_alloc_close();
+#endif
 }
 
 void camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win)
