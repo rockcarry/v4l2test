@@ -104,7 +104,7 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     mic->audio_record_release               = env->GetMethodID(local_audio_record_class, "release", "()V");
 
     // AudioRecord.getMinBufferSize
-    mic->buflen = 1 * env->CallStaticIntMethod(local_audio_record_class,
+    mic->buflen = 2 * env->CallStaticIntMethod(local_audio_record_class,
         audio_record_getMinBufferSize, samprate, chcfg, ENCODING_PCM_16BIT);
 
     // new AudioRecord

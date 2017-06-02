@@ -66,7 +66,7 @@ void* micdev_android_init(int samprate, int channels, void *extra)
     size_t minfcount = 0;
     android::AudioRecord::getMinFrameCount(
         &minfcount, samprate, AUDIO_FORMAT_PCM_16_BIT, chcfg); 
-    mic->buflen = minfcount * channels * 2;
+    mic->buflen = 2 * minfcount * channels * 2;
     mic->buffer = new uint8_t[mic->buflen];
     mic->record = new android::AudioRecord(AUDIO_SOURCE_MIC, samprate, AUDIO_FORMAT_PCM_16_BIT, chcfg, minfcount);
 
