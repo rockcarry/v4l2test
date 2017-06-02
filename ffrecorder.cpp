@@ -57,27 +57,27 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     25,                         // cam_frame_rate_1
 
     // ffencoder output
-    16000,                      // out_audio_bitrate_0
+    22050,                      // out_audio_bitrate_0
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_0
-    16000,                      // out_audio_samprate_0
+    22050,                      // out_audio_samprate_0
     10000000,                   // out_video_bitrate_0
     1920,                       // out_video_width_0
     1080,                       // out_video_height_0
-    25,                         // out_video_frate_0
+    -1,                         // out_video_frate_0
 
     // ffencoder output
-    16000,                      // out_audio_bitrate_1
+    22050,                      // out_audio_bitrate_1
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_1
-    16000,                      // out_audio_samprate_1
+    22050,                      // out_audio_samprate_1
     5000000,                    // out_video_bitrate_1
     1280,                       // out_video_width_1
     720,                        // out_video_height_1
     -1,                         // out_video_frate_1
 
     // ffencoder output
-    16000,                      // out_audio_bitrate_2
+    22050,                      // out_audio_bitrate_2
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_2
-    16000,                      // out_audio_samprate_2
+    22050,                      // out_audio_samprate_2
     2000000,                    // out_video_bitrate_2
     640,                        // out_video_width_2
     480,                        // out_video_height_2
@@ -91,7 +91,7 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
-            if (recorder->audio_source[i] == 0) {
+            if (recorder->audio_source[i] == 0 && recorder->encoder[i]) {
                 ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
             }
         }
@@ -111,7 +111,7 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
             pts -= recorder->rsvpts[0];
         }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
-            if (recorder->video_source[i] == 0) {
+            if (recorder->video_source[i] == 0 && recorder->encoder[i]) {
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
@@ -142,7 +142,7 @@ static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
             pts -= recorder->rsvpts[1];
         }
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
-            if (recorder->video_source[i] == 1) {
+            if (recorder->video_source[i] == 1 && recorder->encoder[i]) {
                 ffencoder_video(recorder->encoder[i], data, linesize, pts);
             }
         }
