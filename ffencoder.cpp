@@ -126,9 +126,9 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // output params
     (char*)"/sdcard/test.mp4",  // filename
-    32000,                      // out_audio_bitrate
+    22050,                      // out_audio_bitrate
     AV_CH_LAYOUT_MONO,          // out_audio_channel_layout
-    44100,                      // out_audio_sample_rate
+    22050,                      // out_audio_sample_rate
     256000,                     // out_video_bitrate
     320,                        // out_video_width
     240,                        // out_video_height
@@ -781,7 +781,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     /* open the output file, if needed */
     if (!(encoder->ofctxt->oformat->flags & AVFMT_NOFILE)) {
         AVDictionary *param = NULL;
-        av_dict_set_int(&param, "blocksize", 128*1024, AV_OPT_FLAG_ENCODING_PARAM);
+//      av_dict_set_int(&param, "blocksize", 128*1024, AV_OPT_FLAG_ENCODING_PARAM);
         ret = avio_open2(&encoder->ofctxt->pb, params->out_filename, AVIO_FLAG_WRITE, NULL, &param);
         if (ret < 0) {
             printf("could not open '%s' !\n", params->out_filename);
