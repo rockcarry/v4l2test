@@ -24,7 +24,7 @@ extern "C" void ion_flush_cache(void *pbuf, int size);
 
 // 内部常量定义
 #define DO_USE_VAR(v)   do { v = v; } while (0)
-#define VIDEO_CAPTURE_BUFFER_COUNT  5
+#define VIDEO_CAPTURE_BUFFER_COUNT  3
 #define NATIVE_WIN_BUFFER_COUNT     3
 #define DEF_WIN_PIX_FMT         HAL_PIXEL_FORMAT_YCrCb_420_SP // HAL_PIXEL_FORMAT_RGBX_8888 or HAL_PIXEL_FORMAT_YCrCb_420_SP
 #define CAMDEV_GRALLOC_USAGE    GRALLOC_USAGE_SW_READ_NEVER \

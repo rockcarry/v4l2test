@@ -92,7 +92,19 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
     if (recorder->state & FRF_RECORDING) {
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->audio_source[i] == 0 && recorder->encoder[i]) {
+#if 1
                 ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
+#else
+                int retry = 5;
+                while (retry--) {
+                    int ret = ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
+                    if (ret == 0) {
+                        break;
+                    } else {
+                        usleep(10*1000);
+                    }
+                }
+#endif
             }
         }
     }

@@ -137,8 +137,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    32,                         // audio_buffer_number
-    5,                          // video_buffer_number
+    60,                         // audio_buffer_number
+    10,                         // video_buffer_number
     0,                          // video_timebase_type
     0,                          // video_encoder_type
 };
