@@ -142,8 +142,8 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    8,                          // audio_buffer_number
-    8,                          // video_buffer_number
+    16,                         // audio_buffer_number
+    16,                         // video_buffer_number
     0,                          // video_timebase_type
     0,                          // video_encoder_type
 };
@@ -820,6 +820,9 @@ void ffencoder_free(void *ctxt)
     pthread_mutex_destroy(&encoder->pktq_mutex);
     sem_destroy(&encoder->pktq_semf);
     sem_destroy(&encoder->pktq_semw);
+    for (int i=0; i<PKT_QUEUE_SIZE; i++) {
+        av_packet_unref(&encoder->pktq_b[i]);
+    }
 
     /* write the trailer, if any. The trailer must be written before you
      * close the CodecContexts open when you wrote the header; otherwise
