@@ -59,7 +59,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     // ffencoder output
     22050,                      // out_audio_bitrate_0
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_0
-    22050,                      // out_audio_samprate_0
+    32000,                      // out_audio_samprate_0
     10000000,                   // out_video_bitrate_0
     1920,                       // out_video_width_0
     1080,                       // out_video_height_0
@@ -68,7 +68,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     // ffencoder output
     22050,                      // out_audio_bitrate_1
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_1
-    22050,                      // out_audio_samprate_1
+    32000,                      // out_audio_samprate_1
     5000000,                    // out_video_bitrate_1
     1280,                       // out_video_width_1
     720,                        // out_video_height_1
@@ -77,7 +77,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     // ffencoder output
     22050,                      // out_audio_bitrate_2
     AV_CH_LAYOUT_MONO,          // out_audio_chlayout_2
-    22050,                      // out_audio_samprate_2
+    32000,                      // out_audio_samprate_2
     2000000,                    // out_video_bitrate_2
     640,                        // out_video_width_2
     480,                        // out_video_height_2
@@ -92,19 +92,7 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
     if (recorder->state & FRF_RECORDING) {
         for (int i=0; i<MAX_ENCODER_NUM; i++) {
             if (recorder->audio_source[i] == 0 && recorder->encoder[i]) {
-#if 1
                 ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
-#else
-                int retry = 5;
-                while (retry--) {
-                    int ret = ffencoder_audio(recorder->encoder[i], data, nbsample, -1);
-                    if (ret == 0) {
-                        break;
-                    } else {
-                        usleep(10*1000);
-                    }
-                }
-#endif
             }
         }
     }

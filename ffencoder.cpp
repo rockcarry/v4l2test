@@ -100,15 +100,20 @@ typedef struct
     pthread_t          aencode_thread_id;
     pthread_t          vencode_thread_id;
 
+    //++ for packet queue
     #define PKT_QUEUE_SIZE 128
-    AVPacket           pkt_queue[PKT_QUEUE_SIZE];
-    sem_t              pkt_semr;
-    sem_t              pkt_semw;
-    int                pkt_head;
-    int                pkt_tail;
-    pthread_t          pktwrite_thread_id;
-
-    pthread_mutex_t    mutex;
+    AVPacket           pktq_b[PKT_QUEUE_SIZE]; // packets
+    AVPacket          *pktq_f[PKT_QUEUE_SIZE]; // free packets queue
+    AVPacket          *pktq_w[PKT_QUEUE_SIZE]; // used packets queue
+    sem_t              pktq_semf;  // free
+    sem_t              pktq_semw;  // used
+    int                pktq_headf;
+    int                pktq_tailf;
+    int                pktq_headw;
+    int                pktq_tailw;
+    pthread_t          pktq_thread_id;
+    pthread_mutex_t    pktq_mutex;
+    //-- for packet queue
 } FFENCODER;
 
 // 内部全局变量定义
@@ -137,45 +142,38 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    60,                         // audio_buffer_number
-    10,                         // video_buffer_number
+    8,                          // audio_buffer_number
+    8,                          // video_buffer_number
     0,                          // video_timebase_type
     0,                          // video_encoder_type
 };
 
 // 内部函数实现
-static void write_frame(FFENCODER *encoder, const AVRational *time_base, AVStream *st, AVPacket *pkt)
-{
-    av_packet_rescale_ts(pkt, *time_base, st->time_base);
-    pkt->stream_index = st->index;
-
-    pthread_mutex_lock  (&encoder->mutex);
-    av_interleaved_write_frame(encoder->ofctxt, pkt);
-    pthread_mutex_unlock(&encoder->mutex);
-}
-
 //++ video packet writing queue
-static AVPacket* video_packet_dequeue(FFENCODER *encoder)
+static AVPacket* avpacket_dequeue(FFENCODER *encoder)
 {
-    sem_wait(&encoder->pkt_semw);
-    return &encoder->pkt_queue[encoder->pkt_tail];
+    AVPacket *pkt = NULL;
+    sem_wait(&encoder->pktq_semf);
+    pthread_mutex_lock  (&encoder->pktq_mutex);
+    pkt = encoder->pktq_f[encoder->pktq_headf];
+    if (++encoder->pktq_headf == PKT_QUEUE_SIZE) {
+        encoder->pktq_headf = 0;
+    }
+    pthread_mutex_unlock(&encoder->pktq_mutex);
+    return pkt;
 }
 
-static void video_packet_enqueue(FFENCODER *encoder, const AVRational *time_base, AVStream *st, AVPacket *pkt)
+static void avpacket_enqueue(FFENCODER *encoder, const AVRational *time_base, AVStream *st, AVPacket *pkt)
 {
     av_packet_rescale_ts(pkt, *time_base, st->time_base);
     pkt->stream_index = st->index;
-
-    if (++encoder->pkt_tail == PKT_QUEUE_SIZE) {
-        encoder->pkt_tail = 0;
+    pthread_mutex_lock  (&encoder->pktq_mutex);
+    encoder->pktq_w[encoder->pktq_tailw] = pkt;
+    if (++encoder->pktq_tailw == PKT_QUEUE_SIZE) {
+        encoder->pktq_tailw = 0;
     }
-
-    sem_post(&encoder->pkt_semr);
-}
-
-static void video_packet_cancel(FFENCODER *encoder)
-{
-    sem_post(&encoder->pkt_semw);
+    pthread_mutex_unlock(&encoder->pktq_mutex);
+    sem_post(&encoder->pktq_semw);
 }
 //-- video packet writing queue
 
@@ -183,18 +181,16 @@ static void* audio_encode_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
     AVFrame   *aframe  = NULL;
-    AVPacket   pkt;
+    AVPacket  *pkt     = NULL;
     int        got     =  0;
     int        ret     =  0;
-
-    memset(&pkt, 0, sizeof(AVPacket));
 
     while (1) {
         if (0 != sem_trywait(&encoder->asemr)) {
             if (encoder->thread_state & FFENCODER_TS_EXIT) {
                 break;
             } else {
-                usleep(20*1000);
+                usleep(10*1000);
                 continue;
             }
         }
@@ -202,16 +198,9 @@ static void* audio_encode_thread_proc(void *param)
         aframe = &encoder->aframes[encoder->ahead];
 
         // encode audio
-        ret = avcodec_encode_audio2(encoder->astream->codec, &pkt, aframe, &got);
-        if (ret < 0) {
-            printf("error encoding audio frame !\n");
-            exit(1);
-        }
-
-        // write audio
-        if (got) {
-            write_frame(encoder, &encoder->astream->codec->time_base, encoder->astream, &pkt);
-        }
+        pkt = avpacket_dequeue(encoder);
+        avcodec_encode_audio2(encoder->astream->codec, pkt, aframe, &got);
+        avpacket_enqueue(encoder, &encoder->astream->codec->time_base, encoder->astream, pkt);
 
         if (++encoder->ahead == encoder->params.audio_buffer_number) {
             encoder->ahead = 0;
@@ -220,10 +209,9 @@ static void* audio_encode_thread_proc(void *param)
     }
 
     do {
-        avcodec_encode_audio2(encoder->astream->codec, &pkt, NULL, &got);
-        if (got) {
-            write_frame(encoder, &encoder->astream->codec->time_base, encoder->astream, &pkt);
-        }
+        pkt = avpacket_dequeue(encoder);
+        avcodec_encode_audio2(encoder->astream->codec, pkt, NULL, &got);
+        avpacket_enqueue(encoder, &encoder->astream->codec->time_base, encoder->astream, pkt);
     } while (got);
 
     return NULL;
@@ -247,7 +235,7 @@ static void* video_encode_thread_proc(void *param)
             if (encoder->thread_state & FFENCODER_TS_EXIT) {
                 break;
             } else {
-                usleep(20*1000);
+                usleep(10*1000);
                 continue;
             }
         }
@@ -257,18 +245,9 @@ static void* video_encode_thread_proc(void *param)
         // encode & write video
         switch (encoder->params.video_encoder_type) {
         case 0: // using x264 software encoder
-            pkt = video_packet_dequeue(encoder);
-            ret = avcodec_encode_video2(encoder->vstream->codec, pkt, vframe, &got);
-            if (ret < 0) {
-                printf("error encoding video frame !\n");
-                exit(1);
-            }
-
-            if (got) {
-                video_packet_enqueue(encoder, &tbms, encoder->vstream, pkt);
-            } else {
-                video_packet_cancel(encoder);
-            }
+            pkt = avpacket_dequeue(encoder);
+            avcodec_encode_video2(encoder->vstream->codec, pkt, vframe, &got);
+            avpacket_enqueue(encoder, &tbms, encoder->vstream, pkt);
             break;
         case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
@@ -288,13 +267,9 @@ static void* video_encode_thread_proc(void *param)
 
     if (encoder->params.video_encoder_type == 0) {
         do {
-            pkt = video_packet_dequeue(encoder);
+            pkt = avpacket_dequeue(encoder);
             avcodec_encode_video2(encoder->vstream->codec, pkt, NULL, &got);
-            if (got) {
-                video_packet_enqueue(encoder, &tbms, encoder->vstream, pkt);
-            } else {
-                video_packet_cancel(encoder);
-            }
+            avpacket_enqueue(encoder, &tbms, encoder->vstream, pkt);
         } while (got);
     }
 
@@ -306,7 +281,7 @@ static void* video_encode_thread_proc(void *param)
     return NULL;
 }
 
-static void* packet_write_thread_proc(void *param)
+static void* packet_thread_proc(void *param)
 {
     FFENCODER *encoder = (FFENCODER*)param;
     AVPacket  *packet  = NULL;
@@ -314,24 +289,35 @@ static void* packet_write_thread_proc(void *param)
     int        i;
 
     while (1) {
-        if (0 != sem_trywait(&encoder->pkt_semr)) {
+        if (0 != sem_trywait(&encoder->pktq_semw)) {
             if (encoder->thread_state & FFENCODER_TS_EXIT) {
                 break;
             } else {
-                usleep(20*1000);
+                usleep(10*1000);
                 continue;
             }
         }
 
-        packet = &(encoder->pkt_queue[encoder->pkt_head]);
-        pthread_mutex_lock  (&encoder->mutex);
-        av_interleaved_write_frame(encoder->ofctxt, packet);
-        pthread_mutex_unlock(&encoder->mutex);
-
-        if (++encoder->pkt_head == PKT_QUEUE_SIZE) {
-            encoder->pkt_head = 0;
+        //+ dequeue packet from pktq_w
+        packet = encoder->pktq_w[encoder->pktq_headw];
+        if (++encoder->pktq_headw == PKT_QUEUE_SIZE) {
+            encoder->pktq_headw = 0;
         }
-        sem_post(&encoder->pkt_semw);
+        //- dequeue packet from pktq_w
+
+        //+ write packet
+        av_interleaved_write_frame(encoder->ofctxt, packet);
+        av_packet_unref(packet);
+        //- write packet
+
+        //+ enqueue packet to pktq_f
+        encoder->pktq_f[encoder->pktq_tailf] = packet;
+        if (++encoder->pktq_tailf == PKT_QUEUE_SIZE) {
+            encoder->pktq_tailf = 0;
+        }
+        //- enqueue packet to pktq_f
+
+        sem_post(&encoder->pktq_semf);
     }
 
     return NULL;
@@ -763,15 +749,16 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
         goto failed;
     }
 
-    // init mutex for audio/video write frame
-    pthread_mutex_init(&encoder->mutex, NULL);
-
     // for packet queue
-    sem_init(&encoder->pkt_semr, 0, 0             );
-    sem_init(&encoder->pkt_semw, 0, PKT_QUEUE_SIZE);
+    pthread_mutex_init(&encoder->pktq_mutex, NULL  );
+    sem_init(&encoder->pktq_semf, 0, PKT_QUEUE_SIZE);
+    sem_init(&encoder->pktq_semw, 0, 0             );
+    for (int i=0; i<PKT_QUEUE_SIZE; i++) {
+        encoder->pktq_f[i] = &encoder->pktq_b[i];
+    }
 
     // create video packet writing thread
-    pthread_create(&encoder->pktwrite_thread_id, NULL, packet_write_thread_proc, encoder);
+    pthread_create(&encoder->pktq_thread_id, NULL, packet_thread_proc, encoder);
 
     /* now that all the parameters are set, we can open the audio and
      * video codecs and allocate the necessary encode buffers. */
@@ -818,20 +805,7 @@ void ffencoder_free(void *ctxt)
     if (encoder->have_audio) close_astream(encoder);
     if (encoder->have_video) close_vstream(encoder);
 
-    encoder->thread_state |= FFENCODER_TS_EXIT;
-    pthread_join(encoder->pktwrite_thread_id, NULL);
-    sem_destroy(&encoder->pkt_semr);
-    sem_destroy(&encoder->pkt_semw);
-
-    // destroy mutex
-    pthread_mutex_destroy(&encoder->mutex);
-
-    /* write the trailer, if any. The trailer must be written before you
-     * close the CodecContexts open when you wrote the header; otherwise
-     * av_write_trailer() may try to use memory that was freed on
-     * av_codec_close(). */
-    av_write_trailer(encoder->ofctxt);
-
+    //+ close hardware encoder
     switch (encoder->params.video_encoder_type) {
     case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
@@ -839,6 +813,19 @@ void ffencoder_free(void *ctxt)
 #endif
         break;
     }
+    //- close hardware encoder
+
+    encoder->thread_state |= FFENCODER_TS_EXIT;
+    pthread_join(encoder->pktq_thread_id, NULL);
+    pthread_mutex_destroy(&encoder->pktq_mutex);
+    sem_destroy(&encoder->pktq_semf);
+    sem_destroy(&encoder->pktq_semw);
+
+    /* write the trailer, if any. The trailer must be written before you
+     * close the CodecContexts open when you wrote the header; otherwise
+     * av_write_trailer() may try to use memory that was freed on
+     * av_codec_close(). */
+    av_write_trailer(encoder->ofctxt);
 
     /* close the output file. */
     if (!(encoder->ofctxt->oformat->flags & AVFMT_NOFILE)) avio_close(encoder->ofctxt->pb);
@@ -979,13 +966,13 @@ int ffencoder_write_video_frame(void *ctxt, int flags, void *data, int size, int
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVRational tbms    = { 1, 1000 };
     AVPacket  *packet  = NULL;
-    packet = video_packet_dequeue(encoder);
+    packet = avpacket_dequeue(encoder);
     av_new_packet(packet, size);
     memcpy(packet->data, data, size);
     packet->flags |= flags;
     packet->pts    = pts;
     packet->dts    = pts;
-    video_packet_enqueue(encoder, &tbms, encoder->vstream, packet);
+    avpacket_enqueue(encoder, &tbms, encoder->vstream, packet);
     return 0;
 }
 
