@@ -34,13 +34,14 @@ static void *h264hwenc_cedarx_init(int iw, int ih, int ow, int oh, int frate, in
         return NULL;
     }
 
+    // cedarx hardware init
+    cedarx_hardware_init(0);
+
+    // init ve mutex
     if (ve_mutex_init(&enc->mutex, CEDARV_ENCODE) < 0) {
         ALOGE("ve_mutex_init fail!!");
         goto failed;
     }
-
-    // cedarx hardware init
-    cedarx_hardware_init(0);
 
     ve_mutex_lock  (&enc->mutex);
     enc->encdev = H264EncInit(&ret);
@@ -119,6 +120,9 @@ static void h264hwenc_cedarx_close(void *ctxt)
         H264EncExit(enc->encdev);
     }
     ve_mutex_unlock(&enc->mutex);
+
+    // destroy ve mutex
+    ve_mutex_destroy(&enc->mutex);
 
     // cedarx hardware exit
     cedarx_hardware_exit(0);
