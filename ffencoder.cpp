@@ -298,24 +298,20 @@ static void* packet_thread_proc(void *param)
             }
         }
 
-        //+ dequeue packet from pktq_w
+        // dequeue packet from pktq_w
         packet = encoder->pktq_w[encoder->pktq_headw];
         if (++encoder->pktq_headw == PKT_QUEUE_SIZE) {
             encoder->pktq_headw = 0;
         }
-        //- dequeue packet from pktq_w
 
-        //+ write packet
+        // write packet
         av_interleaved_write_frame(encoder->ofctxt, packet);
-        av_packet_unref(packet);
-        //- write packet
 
-        //+ enqueue packet to pktq_f
+        // enqueue packet to pktq_f
         encoder->pktq_f[encoder->pktq_tailf] = packet;
         if (++encoder->pktq_tailf == PKT_QUEUE_SIZE) {
             encoder->pktq_tailf = 0;
         }
-        //- enqueue packet to pktq_f
 
         sem_post(&encoder->pktq_semf);
     }
@@ -531,7 +527,8 @@ static void open_video(FFENCODER *encoder)
     int             i, ret;
 
     if (c->codec_id == AV_CODEC_ID_H264) {
-        av_dict_set(&param, "preset", "fast", 0);
+        av_dict_set(&param, "preset" , "fast"    , 0);
+        av_dict_set(&param, "profile", "baseline", 0);
     }
 
     /* open the codec */
@@ -647,6 +644,13 @@ static void close_vstream(FFENCODER *encoder)
     sws_freeContext(encoder->sws_ctx);
 }
 
+static void ffplayer_log_callback(void* ptr, int level, const char *fmt, va_list vl) {
+    if (level <= av_log_get_level()) {
+        char str[1024];
+        vsprintf(str, fmt, vl);
+        ALOGD("%s", str);
+    }
+}
 
 // º¯ÊýÊµÏÖ
 void* ffencoder_init(FFENCODER_PARAMS *params)
@@ -703,6 +707,10 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
 
     // init network
     avformat_network_init();
+
+    // setup log
+//  av_log_set_level(AV_LOG_WARNING);
+//  av_log_set_callback(ffplayer_log_callback);
 
     /* allocate the output media context */
     avformat_alloc_output_context2(&encoder->ofctxt, NULL, NULL, params->out_filename);
