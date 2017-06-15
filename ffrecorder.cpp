@@ -36,11 +36,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
 {
     // micdev input params
     44100,                      // mic_sample_rate
-#ifdef USE_MICDEV_ANDROID
     1,                          // mic_channel_num
-#else
-    2,                          // mic_channel_num
-#endif
 
     // camdev input params
     (char*)"/dev/video0",       // cam_dev_name_0
