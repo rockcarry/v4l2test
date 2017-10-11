@@ -2,7 +2,7 @@
 #define X264_GPL           1
 #define X264_INTERLACED    1
 #define X264_CHROMA_FORMAT 0
-#define X264_REV 2762
+#define X264_REV 2851
 #define X264_REV_DIFF 0
-#define X264_VERSION " r2762 90a61ec"
-#define X264_POINTVER "0.148.2762 90a61ec"
+#define X264_VERSION " r2851 ba24899"
+#define X264_POINTVER "0.152.2851 ba24899"

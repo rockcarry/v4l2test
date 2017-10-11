@@ -1,14 +1,14 @@
-prefix=/home/xujb/ffmpeg/../ffmpeg-android-sdk
+prefix=/home/xujb/v4l2test/ffmpeg/ffmpeg/../ffmpeg-android-sdk
 exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
 Name: libavcodec
 Description: FFmpeg codec library
-Version: 57.48.101
-Requires: 
-Requires.private: libavutil >= 55.28.100
+Version: 57.64.101
+Requires: libavutil >= 55.34.101
+Requires.private: 
 Conflicts:
-Libs: -L${libdir}  -lavcodec 
-Libs.private: -lx264 -lm -lz
+Libs: -L${libdir}  -lavcodec -lx264 -lm -lz
+Libs.private: 
 Cflags: -I${includedir}

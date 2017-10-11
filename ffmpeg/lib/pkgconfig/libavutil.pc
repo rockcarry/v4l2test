@@ -1,14 +1,14 @@
-prefix=/home/xujb/ffmpeg/../ffmpeg-android-sdk
+prefix=/home/xujb/v4l2test/ffmpeg/ffmpeg/../ffmpeg-android-sdk
 exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
 Name: libavutil
 Description: FFmpeg utility library
-Version: 55.28.100
+Version: 55.34.101
 Requires: 
 Requires.private: 
 Conflicts:
-Libs: -L${libdir}  -lavutil 
-Libs.private: -lm
+Libs: -L${libdir}  -lavutil -lm
+Libs.private: 
 Cflags: -I${includedir}

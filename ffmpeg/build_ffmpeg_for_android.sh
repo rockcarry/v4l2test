@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-EXTRA_CFLAGS="-I$PWD/ffmpeg-android-sdk/include -Os -march=armv7-a -mfloat-abi=softfp -mfpu=neon -D__ARM_ARCH_7A__ -D__ANDROID__ -DNDEBUG"
+EXTRA_CFLAGS="-I$PWD/ffmpeg-android-sdk/include -Os -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=softfp -D__ANDROID__ -DNDEBUG"
 EXTRA_LDFLAGS="-L$PWD/ffmpeg-android-sdk/lib -march=armv7-a"
 
 # speed of faac is slower than ffmpeg native aac encoder now
@@ -52,20 +52,21 @@ cd -
 #-- build x264 --#
 
 if [ ! -d ffmpeg ]; then
-  git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg
+  git clone git://source.ffmpeg.org/ffmpeg.git
 fi
 cd ffmpeg
 ./configure \
 --pkg-config=pkg-config \
 --arch=armv7 \
+--cpu=armv7-a \
 --target-os=android \
 --enable-cross-compile \
 --cross-prefix=arm-linux-androideabi- \
 --prefix=$PWD/../ffmpeg-android-sdk \
 --enable-thumb \
 --enable-static \
---enable-shared \
 --enable-small \
+--disable-shared \
 --disable-symver \
 --disable-debug \
 --disable-programs \
@@ -74,6 +75,7 @@ cd ffmpeg
 --disable-avfilter \
 --disable-postproc \
 --disable-everything \
+--disable-swscale-alpha \
 --enable-encoder=libx264 \
 --enable-encoder=aac \
 --enable-encoder=mjpeg \
@@ -82,7 +84,6 @@ cd ffmpeg
 --enable-muxer=mp4 \
 --enable-protocol=file \
 --enable-protocol=rtmp \
---disable-swscale-alpha \
 --enable-asm \
 --enable-gpl \
 --enable-version3 \
