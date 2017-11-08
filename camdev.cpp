@@ -348,7 +348,7 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
     cam->fd = open(dev, O_RDWR | O_NONBLOCK);
     if (cam->fd < 0) {
         ALOGW("failed to open video device: %s\n", dev);
-        free(cam);
+        delete cam;
         return NULL;
     }
 
@@ -415,7 +415,7 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
     else {
         ALOGW("failed to set camera preview size and pixel format !\n");
         close(cam->fd);
-        free (cam);
+        delete cam;
         return NULL;
     }
 
