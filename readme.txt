@@ -34,6 +34,26 @@ How to build
    (I built these codes under AllWinner A33 Android 4.4 source code enviroment.
     So I suggest using NDK version corresponding to Android 4.4.)
 
+if you cloned google AOSP source code, and switch to tag android-4.4.4_r2.0.1, I think it's possible to build v4l2test.
+
+under android source dir, try steps:
+
+1. source build/envsetup.sh
+2. lunch (and select a combo, ex. aosp_arm-eng)
+3. make -j8
+4. cd v4l2test
+5. mm -B -j8
+
+if not using A33 platform, remove
+-DUSE_MEDIASERVER_H264ENC
+-DPLATFORM_ALLWINNER_A33
+from Android.mk
+
+and add
+-DUSE_MEDIACODEC_H264ENC
+
+this will disable allwinner A33 cedarx hw encoding code, and support android mediacodec hw encoding.
+
 
 Features
 ========
