@@ -80,7 +80,6 @@ typedef struct
 
     AVStream          *vstream;
     AVFrame           *vframes;
-    int64_t            next_vpts;
     sem_t              vsemr;
     sem_t              vsemw;
     int                vhead;
@@ -299,19 +298,23 @@ static void* packet_thread_proc(void *param)
         }
 
         // dequeue packet from pktq_w
+        pthread_mutex_lock  (&encoder->pktq_mutex);
         packet = encoder->pktq_w[encoder->pktq_headw];
         if (++encoder->pktq_headw == PKT_QUEUE_SIZE) {
             encoder->pktq_headw = 0;
         }
+        pthread_mutex_unlock(&encoder->pktq_mutex);
 
         // write packet
         av_interleaved_write_frame(encoder->ofctxt, packet);
 
         // enqueue packet to pktq_f
+        pthread_mutex_lock  (&encoder->pktq_mutex);
         encoder->pktq_f[encoder->pktq_tailf] = packet;
         if (++encoder->pktq_tailf == PKT_QUEUE_SIZE) {
             encoder->pktq_tailf = 0;
         }
+        pthread_mutex_unlock(&encoder->pktq_mutex);
 
         sem_post(&encoder->pktq_semf);
     }
@@ -527,8 +530,8 @@ static void open_video(FFENCODER *encoder)
     int             i, ret;
 
     if (c->codec_id == AV_CODEC_ID_H264) {
-        av_dict_set(&param, "preset" , "fast"    , 0);
-        av_dict_set(&param, "profile", "baseline", 0);
+        av_dict_set(&param, "preset" , "ultrafast", 0);
+        av_dict_set(&param, "profile", "baseline" , 0);
     }
 
     /* open the codec */
@@ -882,12 +885,8 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, 
         encoder->asampavail -= sampnum;
 
         if (encoder->asampavail == 0) {
-            if (pts == -1) {
-                encoder->aframecur->pts = encoder->next_apts;
-                encoder->next_apts     += encoder->aframecur->nb_samples;
-            } else {
-                encoder->aframecur->pts = pts;
-            }
+            encoder->aframecur->pts = encoder->next_apts;
+            encoder->next_apts     += encoder->aframecur->nb_samples;
 
             if (++encoder->atail == encoder->params.audio_buffer_number) {
                 encoder->atail = 0;
@@ -914,17 +913,12 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 
     if (0 != sem_trywait(&encoder->vsemw)) {
         ALOGD("video frame dropped by encoder !\n");
-        encoder->next_vpts++;
         return -1;
     }
 
     // vframe pts
     vframe = &encoder->vframes[encoder->vtail];
-    if (pts == -1) {
-        vframe->pts = encoder->next_vpts++;
-    } else {
-        vframe->pts = pts;
-    }
+    vframe->pts = pts;
 
     switch (encoder->params.video_encoder_type) {
     case 2: // input video data is encoded mjpeg data
