@@ -23,13 +23,13 @@ static void* micdev_capture_thread_proc(void *param)
     int   nread = 0;
 
     while (!(mic->thread_state & MICDEV_TS_EXIT)) {
-        if (mic->thread_state & MICDEV_TS_PAUSE) {
+        nread = mic->record->read(mic->buffer, mic->buflen);
+//      ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
+
+        if (nread <= 0 || (mic->thread_state & MICDEV_TS_PAUSE)) {
             usleep(10*1000);
             continue;
         }
-
-        nread = mic->record->read(mic->buffer, mic->buflen);
-//      ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
 
         if (mic->mute) {
             memset(mic->buffer, 0, mic->buflen);
@@ -40,9 +40,6 @@ static void* micdev_capture_thread_proc(void *param)
             int   sampnum = nread / (2 * mic->channels);
             mic->callback(mic->recorder, data, sampnum);
         }
-
-        // sleep to release cpu
-//      usleep(10*1000); // no need this
     }
 
     return NULL;

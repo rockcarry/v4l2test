@@ -26,19 +26,20 @@ typedef struct {
 static void* micdev_capture_thread_proc(void *param)
 {
     MICDEV *mic = (MICDEV*)param;
+    int     ret =  0;
 
     while (!(mic->thread_state & MICDEV_TS_EXIT)) {
-        if (mic->thread_state & MICDEV_TS_PAUSE) {
+        // read data from pcm
+#if 0
+        ret = pcm_read(mic->pcm, mic->buffer, mic->buflen);
+#else
+        ret = pcm_read_ex(mic->pcm, mic->buffer, mic->buflen);
+#endif
+
+        if (ret != 0 || (mic->thread_state & MICDEV_TS_PAUSE)) {
             usleep(10*1000);
             continue;
         }
-
-        // read data from pcm
-#if 0
-        pcm_read(mic->pcm, mic->buffer, mic->buflen);
-#else
-        pcm_read_ex(mic->pcm, mic->buffer, mic->buflen);
-#endif
 
         if (mic->mute) {
             memset(mic->buffer, 0, mic->buflen);
@@ -49,9 +50,6 @@ static void* micdev_capture_thread_proc(void *param)
             int   sampnum = mic->buflen / (2 * mic->config.channels);
             mic->callback(mic->recorder, data, sampnum);
         }
-
-        // sleep to release cpu
-        usleep(10*1000);
     }
 
     return NULL;

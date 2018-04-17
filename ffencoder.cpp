@@ -864,7 +864,7 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, 
     do {
         // resample audio
         if (encoder->asampavail == 0) {
-            if (0 != sem_trywait(&encoder->asemw)) {
+            if (0 != sem_wait(&encoder->asemw)) {
                 ALOGD("audio frame dropped by encoder !\n");
                 return -1;
             }

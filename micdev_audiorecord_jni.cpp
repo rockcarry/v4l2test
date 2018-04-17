@@ -49,14 +49,14 @@ static void* micdev_capture_thread_proc(void *param)
     mic->buffer = (uint8_t*)env->GetByteArrayElements(mic->audio_buffer, 0);
 
     while (!(mic->thread_state & MICDEV_TS_EXIT)) {
-        if (mic->thread_state & MICDEV_TS_PAUSE) {
-            usleep(10*1000);
-            continue;
-        }
-
         nread = env->CallIntMethod(mic->audio_record_obj, mic->audio_record_read,
                     mic->audio_buffer, 0, mic->buflen);
 //      ALOGD("buflen = %d, nread = %d\n", mic->buflen, nread);
+
+        if (nread <= 0 || (mic->thread_state & MICDEV_TS_PAUSE)) {
+            usleep(10*1000);
+            continue;
+        }
 
         if (mic->mute) {
             memset(mic->buffer, 0, mic->buflen);
@@ -67,9 +67,6 @@ static void* micdev_capture_thread_proc(void *param)
             int   sampnum = nread / (2 * mic->channels);
             mic->callback(mic->recorder, data, sampnum);
         }
-
-        // sleep to release cpu
-        usleep(10*1000);
     }
 
     env->ReleaseByteArrayElements(mic->audio_buffer, (jbyte*)mic->buffer, 0);
