@@ -57,7 +57,6 @@ int main(void)
         SWS_POINT,                 // scale_flags
         5,                         // audio_buffer_number
         5,                         // video_buffer_number
-        1,                         // timebase by frame rate
         0,                         // video_encoder_type
     };
     encoder = ffencoder_init(&param);

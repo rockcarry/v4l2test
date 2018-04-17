@@ -24,7 +24,6 @@ extern    JavaVM* g_jvm;
 JNIEXPORT JNIEnv* get_jni_env(void);
 #endif
 
-
 //++ frame dropper
 typedef struct {
     int x;
@@ -80,6 +79,7 @@ typedef struct
 
     AVStream          *vstream;
     AVFrame           *vframes;
+    int64_t            next_vpts;
     sem_t              vsemr;
     sem_t              vsemw;
     int                vhead;
@@ -100,7 +100,7 @@ typedef struct
     pthread_t          vencode_thread_id;
 
     //++ for packet queue
-    #define PKT_QUEUE_SIZE 128
+    #define PKT_QUEUE_SIZE 64
     AVPacket           pktq_b[PKT_QUEUE_SIZE]; // packets
     AVPacket          *pktq_f[PKT_QUEUE_SIZE]; // free packets queue
     AVPacket          *pktq_w[PKT_QUEUE_SIZE]; // used packets queue
@@ -141,14 +141,13 @@ static FFENCODER_PARAMS DEF_FFENCODER_PARAMS =
 
     // other params
     SWS_FAST_BILINEAR,          // scale_flags
-    16,                         // audio_buffer_number
-    16,                         // video_buffer_number
-    0,                          // video_timebase_type
+    6,                          // audio_buffer_number
+    6,                          // video_buffer_number
     0,                          // video_encoder_type
 };
 
 // 内部函数实现
-//++ video packet writing queue
+//++ video packet queue
 static AVPacket* avpacket_dequeue(FFENCODER *encoder)
 {
     AVPacket *pkt = NULL;
@@ -162,9 +161,9 @@ static AVPacket* avpacket_dequeue(FFENCODER *encoder)
     return pkt;
 }
 
-static void avpacket_enqueue(FFENCODER *encoder, const AVRational *time_base, AVStream *st, AVPacket *pkt)
+static void avpacket_enqueue(FFENCODER *encoder, AVPacket *pkt, AVStream *st)
 {
-    av_packet_rescale_ts(pkt, *time_base, st->time_base);
+    av_packet_rescale_ts(pkt, st->codec->time_base, st->time_base);
     pkt->stream_index = st->index;
     pthread_mutex_lock  (&encoder->pktq_mutex);
     encoder->pktq_w[encoder->pktq_tailw] = pkt;
@@ -174,7 +173,18 @@ static void avpacket_enqueue(FFENCODER *encoder, const AVRational *time_base, AV
     pthread_mutex_unlock(&encoder->pktq_mutex);
     sem_post(&encoder->pktq_semw);
 }
-//-- video packet writing queue
+
+static void avpacket_cancel(FFENCODER *encoder, AVPacket *pkt)
+{
+    pthread_mutex_lock  (&encoder->pktq_mutex);
+    encoder->pktq_f[encoder->pktq_tailf] = pkt;
+    if (++encoder->pktq_tailf == PKT_QUEUE_SIZE) {
+        encoder->pktq_tailf = 0;
+    }
+    pthread_mutex_unlock(&encoder->pktq_mutex);
+    sem_post(&encoder->pktq_semf);
+}
+//-- video packet queue
 
 static void* audio_encode_thread_proc(void *param)
 {
@@ -199,7 +209,8 @@ static void* audio_encode_thread_proc(void *param)
         // encode audio
         pkt = avpacket_dequeue(encoder);
         avcodec_encode_audio2(encoder->astream->codec, pkt, aframe, &got);
-        avpacket_enqueue(encoder, &encoder->astream->codec->time_base, encoder->astream, pkt);
+        if (got) avpacket_enqueue(encoder, pkt, encoder->astream);
+        else     avpacket_cancel (encoder, pkt);
 
         if (++encoder->ahead == encoder->params.audio_buffer_number) {
             encoder->ahead = 0;
@@ -210,7 +221,8 @@ static void* audio_encode_thread_proc(void *param)
     do {
         pkt = avpacket_dequeue(encoder);
         avcodec_encode_audio2(encoder->astream->codec, pkt, NULL, &got);
-        avpacket_enqueue(encoder, &encoder->astream->codec->time_base, encoder->astream, pkt);
+        if (got) avpacket_enqueue(encoder, pkt, encoder->astream);
+        else     avpacket_cancel (encoder, pkt);
     } while (got);
 
     return NULL;
@@ -221,7 +233,6 @@ static void* video_encode_thread_proc(void *param)
     FFENCODER *encoder = (FFENCODER*)param;
     AVFrame   *vframe  = NULL;
     AVPacket  *pkt     = NULL;
-    AVRational tbms    = { 1, 1000 };
     int        got     =  0;
     int        ret     =  0;
 
@@ -246,7 +257,8 @@ static void* video_encode_thread_proc(void *param)
         case 0: // using x264 software encoder
             pkt = avpacket_dequeue(encoder);
             avcodec_encode_video2(encoder->vstream->codec, pkt, vframe, &got);
-            avpacket_enqueue(encoder, &tbms, encoder->vstream, pkt);
+            if (got) avpacket_enqueue(encoder, pkt, encoder->vstream);
+            else     avpacket_cancel (encoder, pkt);
             break;
         case 1: // using h264 hardware encoder
 #ifdef ENABLE_H264_HWENC
@@ -268,7 +280,8 @@ static void* video_encode_thread_proc(void *param)
         do {
             pkt = avpacket_dequeue(encoder);
             avcodec_encode_video2(encoder->vstream->codec, pkt, NULL, &got);
-            avpacket_enqueue(encoder, &tbms, encoder->vstream, pkt);
+            if (got) avpacket_enqueue(encoder, pkt, encoder->vstream);
+            else     avpacket_cancel (encoder, pkt);
         } while (got);
     }
 
@@ -409,8 +422,8 @@ static int add_vstream(FFENCODER *encoder)
      * of which frame timestamps are represented. For fixed-fps content,
      * timebase should be 1/framerate and timestamp increments should be
      * identical to 1. */
-    encoder->vstream->time_base.num = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate_den : 1;
-    encoder->vstream->time_base.den = encoder->params.video_timebase_type ? encoder->params.out_video_frame_rate_num : 1000;
+    encoder->vstream->time_base.num = encoder->params.out_video_frame_rate_den;
+    encoder->vstream->time_base.den = encoder->params.out_video_frame_rate_num;
     c->time_base = encoder->vstream->time_base;
     c->gop_size  = encoder->params.out_video_frame_rate_num / encoder->params.out_video_frame_rate_den;
     c->pix_fmt   = AV_PIX_FMT_YUV420P;
@@ -499,6 +512,12 @@ static void open_audio(FFENCODER *encoder)
             c->frame_size);
     }
 
+    /* copy the stream parameters to the muxer */
+    ret = avcodec_parameters_from_context(encoder->astream->codecpar, c);
+    if (ret < 0) {
+        printf("could not copy the stream parameters !\n");
+    }
+
     sem_init(&encoder->asemr, 0, 0                                  );
     sem_init(&encoder->asemw, 0, encoder->params.audio_buffer_number);
 
@@ -532,6 +551,7 @@ static void open_video(FFENCODER *encoder)
     if (c->codec_id == AV_CODEC_ID_H264) {
         av_dict_set(&param, "preset" , "ultrafast", 0);
         av_dict_set(&param, "profile", "baseline" , 0);
+        av_dict_set(&param, "tune", "zerolatency" , 0);
     }
 
     /* open the codec */
@@ -585,6 +605,12 @@ static void open_video(FFENCODER *encoder)
         }
         //-- for encoded video data input, we allocate large enough vframes
         break;
+    }
+
+    /* copy the stream parameters to the muxer */
+    ret = avcodec_parameters_from_context(encoder->vstream->codecpar, c);
+    if (ret < 0) {
+        printf("could not copy the stream parameters !\n");
     }
 
     sem_init(&encoder->vsemr, 0, 0                                  );
@@ -669,7 +695,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     }
 
     // using default params if not set
-    if (!params                          ) params                          = &DEF_FFENCODER_PARAMS;
+    if (!params                          ) params                          =&DEF_FFENCODER_PARAMS;
     if (!params->in_audio_channel_layout ) params->in_audio_channel_layout = DEF_FFENCODER_PARAMS.in_audio_channel_layout;
     if (!params->in_audio_sample_fmt     ) params->in_audio_sample_fmt     = DEF_FFENCODER_PARAMS.in_audio_sample_fmt;
     if (!params->in_audio_sample_rate    ) params->in_audio_sample_rate    = DEF_FFENCODER_PARAMS.in_audio_sample_rate;
@@ -690,19 +716,7 @@ void* ffencoder_init(FFENCODER_PARAMS *params)
     if (!params->scale_flags             ) params->scale_flags             = DEF_FFENCODER_PARAMS.scale_flags;
     if (!params->audio_buffer_number     ) params->audio_buffer_number     = DEF_FFENCODER_PARAMS.audio_buffer_number;
     if (!params->video_buffer_number     ) params->video_buffer_number     = DEF_FFENCODER_PARAMS.video_buffer_number;
-    if (!params->video_timebase_type     ) params->video_timebase_type     = DEF_FFENCODER_PARAMS.video_timebase_type;
     if (!params->video_encoder_type      ) params->video_encoder_type      = DEF_FFENCODER_PARAMS.video_encoder_type;
-
-    //++ for .avi file only support timebase by frame rate
-    len = strlen(params->out_filename);
-    if (len > 4) {
-        str = params->out_filename + len - 4;
-        if (strcasecmp(str, ".avi") == 0) {
-            params->video_timebase_type = 1;
-        }
-    }
-    //-- for .avi file only support timebase by frame rate
-
     memcpy(&encoder->params, params, sizeof(FFENCODER_PARAMS));
 
     /* initialize libavcodec, and register all codecs and formats. */
@@ -854,7 +868,7 @@ void ffencoder_free(void *ctxt)
     avformat_network_deinit();
 }
 
-int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts)
+int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int64_t pts)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     uint8_t   *adatacur[AV_NUM_DATA_POINTERS];
@@ -898,7 +912,7 @@ int ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, 
     return 0;
 }
 
-int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
+int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int64_t pts)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
     AVFrame   *vframe  = NULL;
@@ -913,12 +927,19 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 
     if (0 != sem_trywait(&encoder->vsemw)) {
         ALOGD("video frame dropped by encoder !\n");
+        encoder->next_vpts++;
         return -1;
     }
 
     // vframe pts
     vframe = &encoder->vframes[encoder->vtail];
-    vframe->pts = pts;
+    if (pts == -1) {
+        vframe->pts = encoder->next_vpts++;
+    } else {
+        vframe->pts = av_rescale_q_rnd(pts, AV_TIME_BASE_Q, encoder->vstream->codec->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+        vframe->pts = vframe->pts < encoder->next_vpts ? encoder->next_vpts : vframe->pts;
+        encoder->next_vpts = vframe->pts + 1;
+    }
 
     switch (encoder->params.video_encoder_type) {
     case 2: // input video data is encoded mjpeg data
@@ -940,7 +961,6 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
            && vframe->width  == encoder->params.in_video_width
            && vframe->height == encoder->params.in_video_height ) { // android mediacodec h264 hw encoding
             memcpy(vframe->data[0], ((uint8_t*)data[0]) + 0, vframe->width * vframe->height * 12 / 8 - 0);
-//          memcpy(vframe->data[0], ((uint8_t*)data[0]) + 1, vframe->width * vframe->height * 12 / 8 - 1); // nv21 <-> nv12 for a33
         } else if (vframe->format == AV_PIX_FMT_NONE) { // allwinner cedarx h264 hw encoding
             memcpy(vframe->data, data, sizeof(void*) * AV_NUM_DATA_POINTERS);
         } else
@@ -969,7 +989,6 @@ int ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[A
 int ffencoder_write_video_frame(void *ctxt, int flags, void *data, int size, int64_t pts)
 {
     FFENCODER *encoder = (FFENCODER*)ctxt;
-    AVRational tbms    = { 1, 1000 };
     AVPacket  *packet  = NULL;
     packet = avpacket_dequeue(encoder);
     av_new_packet(packet, size);
@@ -977,7 +996,7 @@ int ffencoder_write_video_frame(void *ctxt, int flags, void *data, int size, int
     packet->flags |= flags;
     packet->pts    = pts;
     packet->dts    = pts;
-    avpacket_enqueue(encoder, &tbms, encoder->vstream, packet);
+    avpacket_enqueue(encoder, packet, encoder->vstream);
     return 0;
 }
 

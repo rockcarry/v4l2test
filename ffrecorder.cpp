@@ -96,7 +96,7 @@ static int micdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
 }
 
 // camdev capture callback
-static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
+static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int64_t pts)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -127,7 +127,7 @@ static int camdev0_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTER
     return 0;
 }
 
-static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts)
+static int camdev1_capture_callback_proc(void *r, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int64_t pts)
 {
     FFRECORDER *recorder = (FFRECORDER*)r;
     if (recorder->state & FRF_RECORDING) {
@@ -440,7 +440,6 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.scale_flags             = 0; // use default
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
-    encoder_params.video_timebase_type     = 0; // timebase by ms
 #ifdef ENABLE_H264_HWENC
     encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 1;
 #else

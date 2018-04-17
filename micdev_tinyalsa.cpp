@@ -19,8 +19,8 @@ typedef struct {
 #define DEF_PCM_CARD      0
 #define DEF_PCM_DEVICE    0
 #define DEF_PCM_FORMAT    PCM_FORMAT_S16_LE
-#define DEF_PCM_BUF_SIZE  8192
-#define DEF_PCM_BUF_COUNT 5
+#define DEF_PCM_BUF_SIZE  2048
+#define DEF_PCM_BUF_COUNT 6
 
 // 内部函数实现
 static void* micdev_capture_thread_proc(void *param)

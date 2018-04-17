@@ -40,9 +40,11 @@ int main(int argc, char *argv[])
     memset(&params, 0, sizeof(params));
     params.cam_frame_width_0  = 640;
     params.cam_frame_height_0 = 480;
+    params.cam_frame_rate_0   = 25;
     params.out_video_bitrate_0= 2000000;
     params.out_video_width_0  = 640;
     params.out_video_height_0 = 480;
+    params.cam_frame_rate_0   = 25;
     recorder = ffrecorder_init(&params, NULL);
 
     // startpreview

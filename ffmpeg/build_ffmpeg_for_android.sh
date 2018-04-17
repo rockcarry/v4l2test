@@ -62,7 +62,7 @@ if [ ! -d ffmpeg ]; then
 fi
 cd ffmpeg
 ./configure \
---pkg-config= \
+--pkg-config=pkg-config \
 --arch=armv7 \
 --cpu=armv7-a \
 --target-os=android \

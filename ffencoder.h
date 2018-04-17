@@ -38,7 +38,6 @@ typedef struct
     int   scale_flags;
     int   audio_buffer_number;
     int   video_buffer_number;
-    int   video_timebase_type; // 0 - by ms, 1 - by frame rate
     int   video_encoder_type;  // 0 - using x264 software encoder
                                // 1 - using h264 hardware encoder
                                // 2 - input video data is encoded mjpeg data
@@ -47,8 +46,8 @@ typedef struct
 // º¯ÊýÉùÃ÷
 void* ffencoder_init (FFENCODER_PARAMS *params);
 void  ffencoder_free (void *ctxt);
-int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int pts);
-int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int pts);
+int   ffencoder_audio(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int nbsample, int64_t pts);
+int   ffencoder_video(void *ctxt, void *data[AV_NUM_DATA_POINTERS], int linesize[AV_NUM_DATA_POINTERS], int64_t pts);
 int   ffencoder_write_video_frame(void *ctxt, int flags, void *data, int size, int64_t pts);
 
 #ifdef __cplusplus

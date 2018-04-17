@@ -72,10 +72,8 @@ typedef struct {
 // 内部函数实现
 static void render_v4l2(CAMDEV *cam,
                         void *dstbuf, int dstlen, int dstfmt, int dstw, int dsth,
-                        void *srcbuf, int srclen, int srcfmt, int srcw, int srch, int pts)
+                        void *srcbuf, int srclen, int srcfmt, int srcw, int srch)
 {
-    DO_USE_VAR(pts);
-
     if (dstfmt != DEF_WIN_PIX_FMT) {
         return;
     }
@@ -192,7 +190,7 @@ static void* camdev_capture_thread_proc(void *param)
             uint8_t *cbuf = (uint8_t*)cam->vbs[cam->buf.index].addr;
             void    *data[AV_NUM_DATA_POINTERS]     = { (uint8_t*)cbuf, (uint8_t*)cbuf + camw * camh, (uint8_t*)cbuf + camw * camh };
             int      linesize[AV_NUM_DATA_POINTERS] = { camw, camw / 1, camw / 1 };
-            int      pts  = (int)(cam->buf.timestamp.tv_sec * 1000 + cam->buf.timestamp.tv_usec / 1000);
+            int64_t  pts  = cam->buf.timestamp.tv_sec * 1000000 + cam->buf.timestamp.tv_usec;
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
             }
@@ -244,7 +242,6 @@ static void* camdev_render_thread_proc(void *param)
             cam->update_flag = 0;
         }
 
-        int   pts  = (int)(cam->buf.timestamp.tv_usec + cam->buf.timestamp.tv_sec * 1000000);
         char *data = (char*)cam->vbs[cam->buf.index].addr;
         int   len  = cam->buf.bytesused;
 
@@ -257,7 +254,7 @@ static void* camdev_render_thread_proc(void *param)
             if (0 == mapper.lock(buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst)) {
                 render_v4l2(cam,
                     dst , -1 , buf->format    , buf->width, buf->height,
-                    data, len, cam->cam_pixfmt, cam->cam_w, cam->cam_h, pts);
+                    data, len, cam->cam_pixfmt, cam->cam_w, cam->cam_h);
                 mapper.unlock(buf->handle);
             }
 
