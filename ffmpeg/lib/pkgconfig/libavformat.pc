@@ -1,4 +1,4 @@
-prefix=/home/xujb/v4l2test/ffmpeg/ffmpeg/../ffmpeg-android-sdk
+prefix=/home/chenk/ffmpeg-android-sdk
 exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
@@ -9,6 +9,6 @@ Version: 57.56.101
 Requires: libavcodec >= 57.64.101, libavutil >= 55.34.101
 Requires.private: 
 Conflicts:
-Libs: -L${libdir}  -lavformat -lx264 -lm -lz
+Libs: -L${libdir}  -lavformat -lx264 -lm -lz -pthread
 Libs.private: 
 Cflags: -I${includedir}

@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-EXTRA_CFLAGS="-I$PWD/ffmpeg-android-sdk/include -Os -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=softfp -D__ANDROID__ -DNDEBUG"
-EXTRA_LDFLAGS="-L$PWD/ffmpeg-android-sdk/lib -march=armv7-a"
+PREFIX_DIR=$PWD/ffmpeg-android-sdk
+SYSROOT=$NDK_HOME/platforms/android-19/arch-arm/
+CROSS_COMPILE=$NDK_HOME/toolchains/arm-linux-androideabi-4.9/prebuilt/windows/bin/arm-linux-androideabi-
+EXTRA_CFLAGS="-I$PREFIX_DIR/include -DANDROID -DNDEBUG -Os -ffast-math -mfpu=neon-vfpv4 -mfloat-abi=softfp"
+EXTRA_LDFLAGS="-L$PREFIX_DIR/lib"
 
 # speed of faac is slower than ffmpeg native aac encoder now
 # so we do not use faac
@@ -36,33 +39,37 @@ fi
 
 #++ build x264 ++#
 if [ ! -d x264 ]; then
-  git clone git://git.videolan.org/x264.git
+  git clone -b stable git://git.videolan.org/x264.git
 fi
 cd x264
-./configure --prefix=$PWD/../ffmpeg-android-sdk \
+./configure --prefix=$PREFIX_DIR \
 --enable-strip \
 --enable-static \
---enable-shared \
+--enable-pic \
+--disable-cli \
+--disable-opencl \
+--disable-avs \
 --host=arm-linux-androideabi \
---cross-prefix=arm-linux-androideabi- \
---extra-cflags="$EXTRA_CFLAGS" \
---extra-ldflags="$EXTRA_LDFLAGS"
+--cross-prefix=$CROSS_COMPILE \
+--sysroot=$SYSROOT
 make STRIP= -j8 && make install
 cd -
 #-- build x264 --#
 
+#++ build ffmpeg ++#
 if [ ! -d ffmpeg ]; then
-  git clone git://source.ffmpeg.org/ffmpeg.git
+  git clone -b fanplayer https://github.com/rockcarry/ffmpeg
 fi
 cd ffmpeg
 ./configure \
---pkg-config=pkg-config \
+--pkg-config= \
 --arch=armv7 \
 --cpu=armv7-a \
 --target-os=android \
 --enable-cross-compile \
---cross-prefix=arm-linux-androideabi- \
---prefix=$PWD/../ffmpeg-android-sdk \
+--cross-prefix=$CROSS_COMPILE \
+--sysroot=$SYSROOT \
+--prefix=$PREFIX_DIR \
 --enable-thumb \
 --enable-static \
 --enable-small \
@@ -91,10 +98,9 @@ cd ffmpeg
 --enable-libx264 \
 --extra-cflags="$EXTRA_CFLAGS" \
 --extra-ldflags="$EXTRA_LDFLAGS"
-
 make -j8 && make install
-
 cd -
+#++ build ffmpeg ++#
 
-#rm -rf x264
-#rm -rf ffmpeg
+echo done
+
