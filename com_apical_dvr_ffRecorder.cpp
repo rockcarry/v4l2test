@@ -5,9 +5,9 @@
 #include <android_runtime/android_graphics_SurfaceTexture.h>
 #include <android_runtime/android_view_Surface.h>
 #include <utils/Log.h>
-#include "com_apical_dvr_MediaRecorder.h"
+#include "com_apical_dvr_ffRecorder.h"
 #include "ffrecorder.h"
-/* Header for class com_apical_dvr_MediaRecorder */
+/* Header for class com_apical_dvr_ffRecorder */
 
 JavaVM* g_jvm = NULL;
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
@@ -48,22 +48,22 @@ JNIEXPORT JNIEnv* get_jni_env(void)
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeInitCallback
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeInitCallback
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeInitCallback
   (JNIEnv *env, jobject obj, jlong ctxt)
 {
     ffrecorder_init_jni_callback((void*)ctxt, env, obj);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeInit
  * Signature: (IIII)J
  */
-JNIEXPORT jlong JNICALL Java_com_apical_dvr_MediaRecorder_nativeInit
+JNIEXPORT jlong JNICALL Java_com_apical_dvr_ffRecorder_nativeInit
   (JNIEnv *env, jclass clazz, jint cam_main_w, jint cam_main_h, jint cam_usb_w, jint cam_usb_h)
 {
     FFRECORDER_PARAMS params;
@@ -76,55 +76,55 @@ JNIEXPORT jlong JNICALL Java_com_apical_dvr_MediaRecorder_nativeInit
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeFree
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeFree
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeFree
   (JNIEnv *env, jclass clazz, jlong ctxt)
 {
     ffrecorder_free((void*)ctxt);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeGetMicMute
  * Signature: (JI)I
  */
-JNIEXPORT jint JNICALL Java_com_apical_dvr_MediaRecorder_nativeGetMicMute
+JNIEXPORT jint JNICALL Java_com_apical_dvr_ffRecorder_nativeGetMicMute
   (JNIEnv *env, jclass clazz, jlong ctxt, jint micidx)
 {
     return ffrecorder_get_mic_mute((void*)ctxt, micidx);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetMicMute
  * Signature: (JII)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetMicMute
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetMicMute
   (JNIEnv *env, jclass clazz, jlong ctxt, jint micidx, jint mute)
 {
     ffrecorder_set_mic_mute((void*)ctxt, micidx, mute);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeResetCamera
  * Signature: (JIIII)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeResetCamera
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeResetCamera
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jint w, jint h, jint frate)
 {
     ffrecorder_reset_camdev((void*)ctxt, camidx, w, h, frate);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetWatermark
  * Signature: (JIIILjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetWatermark
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetWatermark
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jint x, jint y, jstring watermark)
 {
     const char *str = env->GetStringUTFChars(watermark, NULL);
@@ -133,11 +133,11 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetWatermark
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetPreviewWindow
  * Signature: (JILjava/lang/Object;)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetPreviewWindow
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetPreviewWindow
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jobject jsurface)
 {
     sp<IGraphicBufferProducer> gbp;
@@ -152,11 +152,11 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetPreviewWindow
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetPreviewTarget
  * Signature: (JILjava/lang/Object;)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetPreviewTarget
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetPreviewTarget
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jobject jtexture)
 {
     sp<IGraphicBufferProducer> gbp = NULL;
@@ -171,33 +171,33 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetPreviewTarget
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeStartPreview
  * Signature: (JI)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeStartPreview
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeStartPreview
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx)
 {
     ffrecorder_preview_start((void*)ctxt, camidx);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeStopPreview
  * Signature: (JI)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeStopPreview
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeStopPreview
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx)
 {
     ffrecorder_preview_stop((void*)ctxt, camidx);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeStartRecording
  * Signature: (JILjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeStartRecording
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeStartRecording
   (JNIEnv *env, jclass clazz, jlong ctxt, jint encidx, jstring filename)
 {
     const char *str = env->GetStringUTFChars(filename, NULL);
@@ -206,44 +206,44 @@ JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeStartRecording
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeStopRecording
  * Signature: (JI)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeStopRecording
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeStopRecording
   (JNIEnv *env, jclass clazz, jlong ctxt, jint encidx)
 {
     ffrecorder_record_stop((void*)ctxt, encidx);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetAudioSource
  * Signature: (JII)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetAudioSource
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetAudioSource
   (JNIEnv *env, jclass clazz, jlong ctxt, jint encidx, jint source)
 {
     ffrecorder_record_audio_source((void*)ctxt, encidx, source);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeSetVideoSource
  * Signature: (JII)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeSetVideoSource
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeSetVideoSource
   (JNIEnv *env, jclass clazz, jlong ctxt, jint encidx, jint source)
 {
     ffrecorder_record_video_source((void*)ctxt, encidx, source);
 }
 
 /*
- * Class:     com_apical_dvr_MediaRecorder
+ * Class:     com_apical_dvr_ffRecorder
  * Method:    nativeTakePhoto
  * Signature: (JILjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_com_apical_dvr_MediaRecorder_nativeTakePhoto
+JNIEXPORT void JNICALL Java_com_apical_dvr_ffRecorder_nativeTakePhoto
   (JNIEnv *env, jclass clazz, jlong ctxt, jint camidx, jstring filename)
 {
     const char *str = env->GetStringUTFChars(filename, NULL);

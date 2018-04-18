@@ -150,7 +150,7 @@ LOCAL_SRC_FILES := \
     ffjpeg.cpp \
     ffencoder.cpp \
     ffrecorder.cpp \
-    com_apical_dvr_MediaRecorder.cpp
+    com_apical_dvr_ffRecorder.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \

@@ -1,17 +1,25 @@
 package com.apical.dvr;
 
-public class MediaRecorder {
+import android.content.Context;
+import android.graphics.SurfaceTexture;
+import android.view.SurfaceView;
+import android.util.Log;
 
-    private static MediaRecorder mSingleInstance = null;
+public class ffRecorder {
+    private static final String TAG = "ffRecorder";
 
-    public static MediaRecorder getInstance() {
+    private static ffRecorder mSingleInstance = null;
+
+    public static ffRecorder getInstance(Context context) {
         if (mSingleInstance == null) {
-            mSingleInstance = new MediaRecorder();
+            mSingleInstance = new ffRecorder();
+            mSingleInstance.mContext = context;
         }
         return mSingleInstance;
     }
 
-    private long mRecorderContext;
+    private Context mContext         = null;
+    private long    mRecorderContext = 0;
 
     public void init(int cam_main_w, int cam_main_h, int cam_usb_w, int cam_usb_h) {
         mRecorderContext = nativeInit(cam_main_w, cam_main_h, cam_usb_w, cam_usb_h);
@@ -40,11 +48,11 @@ public class MediaRecorder {
         nativeSetWatermark(mRecorderContext, camidx, x, y, watermark);
     }
 
-    public void setPreviewDisplay(int camidx, Object win) {
+    public void setPreviewDisplay(int camidx, SurfaceView win) {
         nativeSetPreviewWindow(mRecorderContext, camidx, win);
     }
 
-    public void setPreviewTexture(int camidx, Object win) {
+    public void setPreviewTexture(int camidx, SurfaceTexture win) {
         nativeSetPreviewTarget(mRecorderContext, camidx, win);
     }
 
