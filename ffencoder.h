@@ -38,9 +38,7 @@ typedef struct
     int   scale_flags;
     int   audio_buffer_number;
     int   video_buffer_number;
-    int   video_encoder_type;  // 0 - using x264 software encoder
-                               // 1 - using h264 hardware encoder
-                               // 2 - input video data is encoded mjpeg data
+    int   enable_h264hwenc;
 } FFENCODER_PARAMS;
 
 // º¯ÊýÉùÃ÷

@@ -78,6 +78,7 @@ static FFRECORDER_PARAMS DEF_FFRECORDER_PARAMS =
     640,                        // out_video_width_2
     480,                        // out_video_height_2
     -1,                         // out_video_frate_2
+    0,                          // enable_h264hwenc
 };
 
 // 内部函数实现
@@ -440,11 +441,7 @@ void ffrecorder_record_start(void *ctxt, int encidx, char *filename)
     encoder_params.scale_flags             = 0; // use default
     encoder_params.audio_buffer_number     = 0; // use default
     encoder_params.video_buffer_number     = 0; // use default
-#ifdef ENABLE_H264_HWENC
-    encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 1;
-#else
-    encoder_params.video_encoder_type      = camdev_get_param(camdev, CAMDEV_PARAM_VIDEO_PIXFMT) == V4L2_PIX_FMT_MJPEG ? 2 : 0;
-#endif
+    encoder_params.enable_h264hwenc        = recorder->params.enable_h264hwenc;
     recorder->enclose[encidx] = recorder->encoder[encidx];
     recorder->encoder[encidx] = ffencoder_init(&encoder_params);
     if (!recorder->encoder[encidx]) {

@@ -72,6 +72,7 @@ JNIEXPORT jlong JNICALL Java_com_apical_dvr_ffRecorder_nativeInit
     params.cam_frame_height_0 = cam_main_h;
     params.cam_frame_width_1  = cam_usb_w;
     params.cam_frame_height_1 = cam_usb_h;
+    params.enable_h264hwenc   = 1; // use h264hwenc
     return (jlong)ffrecorder_init(&params, env);
 }
 

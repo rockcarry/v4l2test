@@ -105,7 +105,6 @@ void h264hwenc_mediaserver_close(void *ctxt)
 {
     H264ENC *enc = (H264ENC*)ctxt;
     if (!enc) return;
-
     enc->cs->close(enc->handle);
     enc->cs = NULL;
     delete enc;
@@ -118,7 +117,7 @@ int h264hwenc_mediaserver_picture_format(void *ctxt)
 
 int h264hwenc_mediaserver_picture_alloc(void *ctxt, AVFrame *frame)
 {
-    frame->format = AV_PIX_FMT_NONE;
+    // do nothing
     return 0;
 }
 
@@ -132,8 +131,7 @@ int h264hwenc_mediaserver_encode(void *ctxt, AVFrame *frame, int timeout)
 {
     H264ENC *enc = (H264ENC*)ctxt;
     if (!enc) return -1;
-
-    enc->cs->encode(enc->handle, frame->pts, frame->data[4], frame->data[5], timeout, enc->ffencoder);
+    enc->cs->encode(enc->handle, frame->pts, frame->data[6], frame->data[7], timeout, enc->ffencoder);
     return 0;
 }
 

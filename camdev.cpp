@@ -194,14 +194,9 @@ static void* camdev_capture_thread_proc(void *param)
             if (cam->cam_pixfmt == V4L2_PIX_FMT_YUYV) {
                 linesize[0] = camw * 2;
             }
-            if (cam->cam_pixfmt == V4L2_PIX_FMT_MJPEG) {
-                // for mjpeg camera, data[0] store buffer addr, data[1] store buffer size
-                data[1] = (void*)cam->buf.bytesused;
-            }
-            //++ for cedarx h264 hardware encoding need physic addr
-            data[4] = (uint8_t*)cam->buf.m.offset;
-            data[5] = (uint8_t*)cam->buf.m.offset + camw * camh;
-            //-- for cedarx h264 hardware encoding need physic addr
+            linesize[AV_NUM_DATA_POINTERS-1] = cam->buf.bytesused;   // store the buffer size
+            data    [AV_NUM_DATA_POINTERS-2] = (uint8_t*)cam->buf.m.offset;  // store the physic addr1
+            data    [AV_NUM_DATA_POINTERS-1] = (uint8_t*)cam->buf.m.offset + camw * camh;  // store the physic addr2
             cam->callback(cam->recorder, data, linesize, pts);
         }
 

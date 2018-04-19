@@ -58,6 +58,7 @@ typedef struct
     int   out_video_width_2;
     int   out_video_height_2;
     int   out_video_frate_2; // -1 means same as camdev input
+    int   enable_h264hwenc;
 } FFRECORDER_PARAMS;
 
 // º¯Êý¶¨Òå

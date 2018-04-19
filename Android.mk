@@ -135,15 +135,13 @@ LOCAL_MODULE := libffrecorder_jni
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += \
-    -DUSE_MICDEV_ANDROID \
     -DENABLE_MEDIARECORDER_JNI \
-    -DENABLE_H264_HWENC \
+    -DUSE_MICDEV_ANDROID \
     -DUSE_MEDIASERVER_H264ENC \
     -DPLATFORM_ALLWINNER_A33
 
 LOCAL_SRC_FILES := \
     h264hwenc_mediacodec.cpp \
-    h264hwenc_cedarx.cpp \
     h264hwenc_mediaserver.cpp \
     micdev_audiorecord_native.cpp \
     camdev.cpp \
@@ -160,9 +158,7 @@ LOCAL_SHARED_LIBRARIES := \
     libgui \
     libandroid_runtime \
     libmedia \
-    libion_alloc \
-    libcedarxosal \
-    libaw_h264enc
+    libion_alloc
 
 #++ for ffmpeg library
 LOCAL_CFLAGS += \
