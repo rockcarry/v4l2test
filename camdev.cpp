@@ -44,9 +44,10 @@ typedef struct {
     sp<ANativeWindow>       cur_win;
     int                     win_w;
     int                     win_h;
-    #define CAMDEV_TS_EXIT       (1 << 0)
-    #define CAMDEV_TS_PAUSE      (1 << 1)
-    #define CAMDEV_TS_PREVIEW    (1 << 2)
+    #define CAMDEV_TS_EXIT       (1 << 0)  // exit threads
+    #define CAMDEV_TS_PAUSE_C    (1 << 1)  // pause capture
+    #define CAMDEV_TS_PAUSE_P    (1 << 2)  // pause preview
+    #define CAMDEV_TS_PREVIEW    (1 << 3)  // enable preview
     sem_t                   sem_render;
     pthread_t               thread_id_render;
     pthread_t               thread_id_capture;
@@ -157,9 +158,8 @@ static void* camdev_capture_thread_proc(void *param)
             continue;
         }
 
-        if (cam->thread_state & CAMDEV_TS_EXIT) {
-            break;
-        } else if (cam->thread_state & CAMDEV_TS_PAUSE) {
+        if (cam->thread_state & CAMDEV_TS_PAUSE_C) {
+            cam->thread_state |= (CAMDEV_TS_PAUSE_C << 16);
             usleep(10*1000);
             continue;
         }
@@ -222,8 +222,10 @@ static void* camdev_render_thread_proc(void *param)
             break;
         }
 
-        if (cam->thread_state & CAMDEV_TS_EXIT) {
-            break;
+        if (cam->thread_state & CAMDEV_TS_PAUSE_P) {
+            cam->thread_state |= (CAMDEV_TS_PAUSE_P << 16);
+            usleep(10*1000);
+            continue;
         }
 
         if (cam->update_flag) {
@@ -433,8 +435,7 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
     req.memory = V4L2_MEMORY_MMAP;
     ioctl(cam->fd, VIDIOC_REQBUFS, &req);
 
-    for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++)
-    {
+    for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
         cam->buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         cam->buf.memory = V4L2_MEMORY_MMAP;
         cam->buf.index  = i;
@@ -451,8 +452,8 @@ void* camdev_init(const char *dev, int sub, int w, int h, int frate)
         cam->jpegdec = ffjpeg_decoder_init();
     }
 
-    // set test frame rate flag
-    cam->thread_state |= CAMDEV_TS_PAUSE;
+    // set capture & preview pause flags
+    cam->thread_state |= (CAMDEV_TS_PAUSE_C | CAMDEV_TS_PAUSE_P);
 
     // create sem_render
     sem_init(&cam->sem_render, 0, 0);
@@ -499,6 +500,78 @@ void camdev_close(void *ctxt)
 #endif
 }
 
+void camdev_reset(void *ctxt, int w, int h, int frate)
+{
+    CAMDEV *cam = (CAMDEV*)ctxt;
+    int old_thread_state = cam->thread_state;
+
+    // stop preview thread
+    cam->thread_state &=~(CAMDEV_TS_PAUSE_P << 16);
+    cam->thread_state |= (CAMDEV_TS_PAUSE_P << 0 );
+    sem_post(&cam->sem_render);
+    while ((cam->thread_state & (CAMDEV_TS_PAUSE_P << 16)) == 0) usleep(10000);
+
+    // stop capture thread
+    camdev_capture_stop(cam);
+
+    // unmap buffers
+    for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
+        munmap(cam->vbs[i].addr, cam->vbs[i].len);
+    }
+
+    cam->cam_w = w;
+    cam->cam_h = h;
+    v4l2_try_fmt_size(cam->fd, cam->cam_pixfmt, &cam->cam_w, &cam->cam_h);
+
+    struct v4l2_format v4l2fmt;
+    v4l2fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    ioctl(cam->fd, VIDIOC_G_FMT, &v4l2fmt);
+    v4l2fmt.fmt.pix.pixelformat = cam->cam_pixfmt;
+    v4l2fmt.fmt.pix.width       = cam->cam_w;
+    v4l2fmt.fmt.pix.height      = cam->cam_h;
+    ioctl(cam->fd, VIDIOC_S_FMT, &v4l2fmt);
+
+    struct v4l2_streamparm streamparam;
+    streamparam.parm.capture.timeperframe.numerator   = 1;
+    streamparam.parm.capture.timeperframe.denominator = frate;
+    streamparam.parm.capture.capturemode              = 0;
+    streamparam.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    ioctl(cam->fd, VIDIOC_S_PARM, &streamparam);
+    ioctl(cam->fd, VIDIOC_G_PARM, &streamparam);
+    cam->cam_frate_num = streamparam.parm.capture.timeperframe.denominator;
+    cam->cam_frate_den = streamparam.parm.capture.timeperframe.numerator;
+
+    // remap buffers
+    struct v4l2_requestbuffers req;
+    req.count  = VIDEO_CAPTURE_BUFFER_COUNT;
+    req.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    req.memory = V4L2_MEMORY_MMAP;
+    ioctl(cam->fd, VIDIOC_REQBUFS, &req);
+    for (int i=0; i<VIDEO_CAPTURE_BUFFER_COUNT; i++) {
+        cam->buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        cam->buf.memory = V4L2_MEMORY_MMAP;
+        cam->buf.index  = i;
+        ioctl(cam->fd, VIDIOC_QUERYBUF, &cam->buf);
+        cam->vbs[i].addr= mmap(NULL, cam->buf.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                               cam->fd, cam->buf.m.offset);
+        cam->vbs[i].len = cam->buf.length;
+        ioctl(cam->fd, VIDIOC_QBUF, &cam->buf);
+    }
+
+    // set update_flag
+    cam->update_flag = 1;
+
+    // start capture if needed
+    if (!(old_thread_state & CAMDEV_TS_PAUSE_C)) {
+        camdev_capture_start(ctxt);
+    }
+
+    // clear preview pause flags
+    if (!(old_thread_state & CAMDEV_TS_PAUSE_P)) {
+        cam->thread_state &= ~CAMDEV_TS_PAUSE_P;
+    }
+}
+
 void camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win)
 {
     CAMDEV *cam = (CAMDEV*)ctxt;
@@ -521,13 +594,6 @@ void camdev_set_preview_target(void *ctxt, const sp<IGraphicBufferProducer>& gbp
     camdev_set_preview_window(cam, win);
 }
 
-sp<ANativeWindow> camdev_get_preview_window(void *ctxt)
-{
-    CAMDEV *cam = (CAMDEV*)ctxt;
-    if (!cam) return NULL;
-    return cam->cur_win;
-}
-
 void camdev_capture_start(void *ctxt)
 {
     CAMDEV *cam = (CAMDEV*)ctxt;
@@ -539,7 +605,7 @@ void camdev_capture_start(void *ctxt)
     ioctl(cam->fd, VIDIOC_STREAMON, &type);
 
     // resume thread
-    cam->thread_state &= ~CAMDEV_TS_PAUSE;
+    cam->thread_state &= ~CAMDEV_TS_PAUSE_C;
 }
 
 void camdev_capture_stop(void *ctxt)
@@ -549,7 +615,7 @@ void camdev_capture_stop(void *ctxt)
     if (!cam || cam->fd <= 0) return;
 
     // pause thread
-    cam->thread_state |= CAMDEV_TS_PAUSE;
+    cam->thread_state |= CAMDEV_TS_PAUSE_C;
 
     // turn off stream
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -561,6 +627,7 @@ void camdev_preview_start(void *ctxt)
     CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     // set start prevew flag
+    cam->thread_state &=~CAMDEV_TS_PAUSE_P;
     cam->thread_state |= CAMDEV_TS_PREVIEW;
 }
 
@@ -569,7 +636,8 @@ void camdev_preview_stop(void *ctxt)
     CAMDEV *cam = (CAMDEV*)ctxt;
     if (!cam) return;
     // set stop prevew flag
-    cam->thread_state &= ~CAMDEV_TS_PREVIEW;
+    cam->thread_state |= CAMDEV_TS_PAUSE_P;
+    cam->thread_state &=~CAMDEV_TS_PREVIEW;
 }
 
 void camdev_set_watermark(void *ctxt, int x, int y, const char *wm)

@@ -25,10 +25,10 @@ enum {
 // º¯Êý¶¨Òå
 void* camdev_init (const char *dev, int sub, int w, int h, int frate);
 void  camdev_close(void *ctxt);
+void  camdev_reset(void *ctxt, int w, int h, int frate);
 
 void  camdev_set_preview_window(void *ctxt, const sp<ANativeWindow> win);
 void  camdev_set_preview_target(void *ctxt, const sp<IGraphicBufferProducer>& gbp);
-sp<ANativeWindow> camdev_get_preview_window(void *ctxt);
 
 void  camdev_capture_start(void *ctxt);
 void  camdev_capture_stop (void *ctxt);

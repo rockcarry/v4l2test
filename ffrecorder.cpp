@@ -291,20 +291,13 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
     FFRECORDER *recorder = (FFRECORDER*)ctxt;
     char       *dev_name = NULL;
     int         sub_src  = 0;
-    sp<ANativeWindow> win= NULL;
     if (!recorder || camidx < 0 || camidx >= MAX_CAMDEV_NUM) return;
-
-    win = camdev_get_preview_window(recorder->camdev[camidx]);
-    camdev_capture_stop(recorder->camdev[camidx]);
-    camdev_close(recorder->camdev[camidx]);
 
     switch (camidx) {
     case 0:
         w     = (w     == -1) ? recorder->params.cam_frame_width_0  : w;
         h     = (h     == -1) ? recorder->params.cam_frame_height_0 : h;
         frate = (frate == -1) ? recorder->params.cam_frame_rate_0   : frate;
-        dev_name = recorder->params.cam_dev_name_0;
-        sub_src  = recorder->params.cam_sub_src_0;
         recorder->params.cam_frame_width_0  = w;
         recorder->params.cam_frame_height_0 = h;
         recorder->params.cam_frame_rate_0   = frate;
@@ -313,18 +306,13 @@ void ffrecorder_reset_camdev(void *ctxt, int camidx, int w, int h, int frate)
         w     = (w     == -1) ? recorder->params.cam_frame_width_1  : w;
         h     = (h     == -1) ? recorder->params.cam_frame_height_1 : h;
         frate = (frate == -1) ? recorder->params.cam_frame_rate_1   : frate;
-        dev_name = recorder->params.cam_dev_name_1;
-        sub_src  = recorder->params.cam_sub_src_1;
         recorder->params.cam_frame_width_1  = w;
         recorder->params.cam_frame_height_1 = h;
         recorder->params.cam_frame_rate_1   = frate;
         break;
     }
 
-    recorder->camdev[camidx] = camdev_init(dev_name, sub_src, w, h, frate);
-    camdev_capture_start(recorder->camdev[camidx]);
-    camdev_set_callback(recorder->camdev[camidx], (void*)(camidx ? camdev1_capture_callback_proc : camdev0_capture_callback_proc), recorder);
-    camdev_set_preview_window(recorder->camdev[camidx], win);
+    camdev_reset(recorder->camdev[camidx], w, h, frate);
 }
 
 void ffrecorder_set_watermark(void *ctxt, int camidx, int x, int y, char *watermark)
